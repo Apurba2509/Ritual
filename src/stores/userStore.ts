@@ -78,8 +78,39 @@ export const useUserStore = create<UserState>((set) => ({
         .eq('id', userId)
         .maybeSingle();
         
-      if (error) throw error;
-      set({ profile: data || null });
+      let profileData = data;
+      const { user } = useUserStore.getState();
+      
+      // Auto-sync Google OAuth metadata if profile is missing it
+      if (profileData && user?.user_metadata) {
+        let needsUpdate = false;
+        const updates: any = {};
+        
+        if (!profileData.display_name && (user.user_metadata.full_name || user.user_metadata.name)) {
+          updates.display_name = user.user_metadata.full_name || user.user_metadata.name;
+          needsUpdate = true;
+        }
+        
+        if (!profileData.avatar_url && user.user_metadata.avatar_url) {
+          updates.avatar_url = user.user_metadata.avatar_url;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          const { data: updatedProfile, error: updateError } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', userId)
+            .select()
+            .single();
+            
+          if (!updateError && updatedProfile) {
+            profileData = updatedProfile;
+          }
+        }
+      }
+      
+      set({ profile: profileData || null });
     } catch (error) {
       console.error('Error fetching profile:', error);
     }

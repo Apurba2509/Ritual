@@ -12,7 +12,7 @@ export default function SocialScreen() {
   const handleAddFriend = () => {
     Alert.prompt('Add Friend', 'Enter the username of the person you want to add:', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Send Request', onPress: (username) => Alert.alert('Request Sent', `Friend request sent to ${username}!`) }
+      { text: 'Send Request', onPress: (username?: string) => Alert.alert('Request Sent', `Friend request sent to ${username || 'them'}!`) }
     ]);
   };
 
@@ -49,7 +49,11 @@ export default function SocialScreen() {
           feed.map((item, index) => (
             <FadeIn key={item.id} delay={index * 100} duration={400} direction="up">
               <View className="flex-row items-center mb-4 pb-4 border-b border-white/5">
-                <Avatar name={item.profiles?.username || 'User'} size={40} />
+                <Avatar 
+                  name={item.profiles?.username || 'User'} 
+                  url={item.profiles?.avatar_url}
+                  size={40} 
+                />
                 <View className="ml-3 flex-1">
                   <Text className="font-body text-textPrimary">
                     <Text className="font-heading">{item.profiles?.username || 'User'}</Text> {item.type.replace(/_/g, ' ')}

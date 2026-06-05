@@ -123,6 +123,7 @@ export default function SignupScreen() {
 
         <Button
           title="Sign Up"
+          variant="gradient"
           className="mt-6"
           loading={loading && !oauthLoading}
           disabled={!email || !password || !username || !!oauthLoading}

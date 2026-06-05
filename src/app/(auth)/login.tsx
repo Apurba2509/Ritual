@@ -106,6 +106,7 @@ export default function LoginScreen() {
 
         <Button
           title="Log In"
+          variant="gradient"
           className="mt-6"
           loading={loading && !oauthLoading}
           disabled={!email || !password || !!oauthLoading}

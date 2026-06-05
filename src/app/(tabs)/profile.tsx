@@ -20,7 +20,11 @@ export default function ProfileScreen() {
   return (
     <ScrollView className="flex-1 bg-background pt-16 px-4">
       <View className="flex-row items-center mb-8">
-        <Avatar name={profile?.username || profile?.display_name || 'User'} size={80} />
+        <Avatar 
+          name={profile?.username || profile?.display_name || 'User'} 
+          url={profile?.avatar_url}
+          size={80} 
+        />
         <View className="ml-4 flex-1">
           <Text className="font-heading text-textPrimary text-2xl">{profile?.username || profile?.display_name || 'Ritual Member'}</Text>
         </View>
