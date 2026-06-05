@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { MMKV } from 'react-native-mmkv';
+import { createMMKV } from 'react-native-mmkv';
 import { Habit, HabitCompletion } from '../types/habit.types';
 
 // @ts-ignore
-export const storage = new MMKV({ id: 'habit-storage' });
+export const storage = createMMKV({ id: 'habit-storage' });
 
 const zustandStorage = {
   setItem: (name: string, value: string) => {

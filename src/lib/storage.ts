@@ -1,8 +1,8 @@
-import { MMKV } from 'react-native-mmkv';
+import { createMMKV } from 'react-native-mmkv';
 
-// @ts-ignore
-export const storage = new MMKV({
-  id: 'ritual-global-storage',
+// Create a unified app storage
+export const storage = createMMKV({
+  id: 'ritual-app-storage',
   encryptionKey: 'ritual-super-secure-key' // In a real app, securely generate and store this
 });
 

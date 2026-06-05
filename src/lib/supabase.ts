@@ -1,9 +1,9 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
-import { MMKV } from 'react-native-mmkv';
+import { createMMKV } from 'react-native-mmkv';
 
 // @ts-ignore
-const storage = new MMKV({
+const storage = createMMKV({
   id: 'supabase-auth-storage'
 });
 
