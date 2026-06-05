@@ -1,15 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { supabase } from '../../lib/supabase';
+
+// Required for web browser auth flow
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   const handleLogin = async () => {
     if (!email || !password) return;
@@ -22,8 +28,32 @@ export default function LoginScreen() {
 
     if (error) {
       Alert.alert('Login Failed', error.message);
-    } else {
-      // Supabase auth listener in useAuth will redirect automatically
+    }
+  };
+
+  const handleOAuthLogin = async (provider: 'google' | 'apple') => {
+    try {
+      setOauthLoading(provider);
+      const redirectUrl = Linking.createURL('/(tabs)');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+        if (res.type === 'success') {
+          // Supabase auth listener handles session extraction from URL automatically
+        }
+      }
+    } catch (error: any) {
+      Alert.alert(`${provider} Login Failed`, error.message);
+    } finally {
+      setOauthLoading(null);
     }
   };
 
@@ -58,15 +88,38 @@ export default function LoginScreen() {
         <Button
           title="Log In"
           className="mt-6"
-          loading={loading}
-          disabled={!email || !password}
+          loading={loading && !oauthLoading}
+          disabled={!email || !password || !!oauthLoading}
           onPress={handleLogin}
+        />
+
+        <View className="my-6 flex-row items-center justify-center">
+          <View className="flex-1 h-[1px] bg-white/10" />
+          <Text className="text-textSecondary mx-4">OR</Text>
+          <View className="flex-1 h-[1px] bg-white/10" />
+        </View>
+
+        <Button
+          title="Continue with Google"
+          variant="outlined"
+          className="mb-4"
+          loading={oauthLoading === 'google'}
+          disabled={!!oauthLoading || loading}
+          onPress={() => handleOAuthLogin('google')}
+        />
+
+        <Button
+          title="Continue with Apple"
+          variant="outlined"
+          className="mb-6"
+          loading={oauthLoading === 'apple'}
+          disabled={!!oauthLoading || loading}
+          onPress={() => handleOAuthLogin('apple')}
         />
 
         <Button
           title="Back"
           variant="ghost"
-          className="mt-4"
           onPress={() => router.back()}
         />
       </View>

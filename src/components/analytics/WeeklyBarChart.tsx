@@ -5,9 +5,6 @@ import { useFont } from '@shopify/react-native-skia';
 import { useHabitStore } from '../../stores/habitStore';
 
 export const WeeklyBarChart = () => {
-  // Use a system font placeholder, in a real app you'd load Inter or use system
-  const font = useFont(require('../../../assets/fonts/SpaceMono-Regular.ttf'), 12);
-  
   // Mock data: completions per day of the current week
   const data = [
     { day: 'M', count: 3 },
@@ -19,10 +16,6 @@ export const WeeklyBarChart = () => {
     { day: 'S', count: 1 },
   ];
 
-  if (!font) {
-    return <View className="h-48 justify-center items-center"><Text className="text-white">Loading...</Text></View>;
-  }
-
   return (
     <View style={styles.container}>
       <CartesianChart 
@@ -30,12 +23,6 @@ export const WeeklyBarChart = () => {
         xKey="day" 
         yKeys={["count"]} 
         domainPadding={{ left: 20, right: 20, top: 10, bottom: 0 }}
-        axisOptions={{ 
-          font,
-          tickCount: 7,
-          labelColor: '#9CA3AF',
-          lineColor: 'transparent',
-        }}
       >
         {({ points, chartBounds }) => (
           <Bar

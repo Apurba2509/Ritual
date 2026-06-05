@@ -2,7 +2,6 @@ import '../../global.css';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { CelebrationModal } from '../components/gamification/CelebrationModal';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Outfit_700Bold } from '@expo-google-fonts/outfit';
@@ -28,14 +27,12 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={DarkTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0C0E14' } }}>
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
         <CelebrationModal />
         <StatusBar style="light" />
-      </ThemeProvider>
     </QueryClientProvider>
   );
 }
