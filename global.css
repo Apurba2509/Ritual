@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #0C0E14;
+    --surface1: rgba(255, 255, 255, 0.06);
+    --surface2: rgba(255, 255, 255, 0.10);
+    --primary: #7C3AED;
+    --secondary: #10B981;
+    --warm: #F59E0B;
+    --streak-fire: #FF6B35;
+    --text-primary: #F9FAFB;
+    --text-secondary: #9CA3AF;
+    --border: rgba(255, 255, 255, 0.08);
+    --danger: #EF4444;
+    --success: #10B981;
+  }
+}

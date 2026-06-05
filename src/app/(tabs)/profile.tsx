@@ -1,0 +1,60 @@
+import React from 'react';
+import { View, Text, ScrollView, Switch } from 'react-native';
+import { useAuth } from '../../hooks/useAuth';
+import { useUserStore } from '../../stores/userStore';
+import { Avatar } from '../../components/ui/Avatar';
+import { Button } from '../../components/ui/Button';
+import { LevelBadge } from '../../components/gamification/LevelBadge';
+import { getLevelFromXP, getXPProgress } from '../../utils/xpUtils';
+
+export default function ProfileScreen() {
+  const { signOut } = useAuth();
+  const { profile } = useUserStore();
+
+  const xp = profile?.xp_total || 0;
+  const level = getLevelFromXP(xp);
+  const { currentLevelXP, nextLevelXP, progress } = getXPProgress(xp);
+
+  return (
+    <ScrollView className="flex-1 bg-background pt-16 px-4">
+      <View className="flex-row items-center mb-8">
+        <Avatar name={profile?.username || 'User'} size={80} />
+        <View className="ml-4 flex-1">
+          <Text className="font-heading text-textPrimary text-2xl">{profile?.username || 'Ritual Member'}</Text>
+        </View>
+        <LevelBadge level={level} size={56} />
+      </View>
+
+      <View className="mb-8">
+        <View className="flex-row justify-between mb-2">
+          <Text className="font-stat text-textSecondary text-xs tracking-wider uppercase">Level Progress</Text>
+          <Text className="font-stat text-textSecondary text-xs">{currentLevelXP} / {nextLevelXP} XP</Text>
+        </View>
+        <View className="h-2 bg-surface1 rounded-full overflow-hidden">
+          <View className="h-full bg-primary rounded-full" style={{ width: `${progress * 100}%` }} />
+        </View>
+      </View>
+
+      <View className="mb-8">
+        <Text className="font-heading text-textPrimary text-xl mb-4">Settings</Text>
+        
+        <View className="bg-surface1 rounded-2xl overflow-hidden border border-white/5">
+          <View className="flex-row justify-between items-center p-4 border-b border-white/5">
+            <Text className="font-body text-textPrimary">Morning Brief Notification</Text>
+            <Switch value={true} trackColor={{ false: '#374151', true: '#7C3AED' }} />
+          </View>
+          <View className="flex-row justify-between items-center p-4 border-b border-white/5">
+            <Text className="font-body text-textPrimary">Streak at Risk Warning</Text>
+            <Switch value={true} trackColor={{ false: '#374151', true: '#7C3AED' }} />
+          </View>
+          <View className="flex-row justify-between items-center p-4">
+            <Text className="font-body text-textPrimary">Dark Theme</Text>
+            <Switch value={true} trackColor={{ false: '#374151', true: '#7C3AED' }} disabled />
+          </View>
+        </View>
+      </View>
+
+      <Button title="Sign Out" variant="outlined" onPress={signOut} className="mb-12" />
+    </ScrollView>
+  );
+}
