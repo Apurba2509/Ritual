@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import Animated, { FadeInDown, FadeInUp, withDelay, withSpring } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Button } from '../../../components/ui/Button';
 
 export default function OnboardingWelcome() {
@@ -29,9 +29,8 @@ export default function OnboardingWelcome() {
         entering={FadeInUp.springify().damping(14).delay(300)}
         className="items-center justify-center flex-1"
       >
-        {/* Placeholder for the 4 floating habit cards animation */}
         <View style={styles.floatingCardPlaceholder}>
-          <Text className="text-textSecondary font-stat">✨ Animated Hero ✨</Text>
+          <Text className="text-textSecondary font-stat">Animated Hero</Text>
         </View>
       </Animated.View>
 

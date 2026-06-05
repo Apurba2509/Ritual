@@ -14,6 +14,8 @@ import { useRealtime } from '../hooks/useRealtime';
 // Register background fetch early
 registerBackgroundTasks();
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 export default function RootLayout() {
   // Connect to realtime feed globally
   useRealtime();
@@ -26,13 +28,15 @@ export default function RootLayout() {
   });
 
   return (
-    <QueryClientProvider client={queryClient}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0C0E14' } }}>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        </Stack>
-        <CelebrationModal />
-        <StatusBar style="light" />
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0C0E14' } }}>
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          </Stack>
+          <CelebrationModal />
+          <StatusBar style="light" />
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
