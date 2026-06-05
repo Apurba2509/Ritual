@@ -6,6 +6,7 @@ import * as Linking from 'expo-linking';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { supabase } from '../../lib/supabase';
+import { FontAwesome } from '@expo/vector-icons';
 
 // Required for web browser auth flow
 WebBrowser.maybeCompleteAuthSession();
@@ -137,19 +138,11 @@ export default function SignupScreen() {
         <Button
           title="Sign Up with Google"
           variant="outlined"
-          className="mb-4"
+          className="mb-6"
+          icon={<FontAwesome name="google" size={20} color="#F9FAFB" />}
           loading={oauthLoading === 'google'}
           disabled={!!oauthLoading || loading}
           onPress={() => handleOAuthLogin('google')}
-        />
-
-        <Button
-          title="Sign Up with Apple"
-          variant="outlined"
-          className="mb-6"
-          loading={oauthLoading === 'apple'}
-          disabled={!!oauthLoading || loading}
-          onPress={() => handleOAuthLogin('apple')}
         />
 
         <Button

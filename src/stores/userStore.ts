@@ -25,9 +25,10 @@ interface UserState {
   profile: Profile | null;
   settings: Settings;
   isLoading: boolean;
+  isSavingSettings: boolean;
   setSession: (session: Session | null) => void;
   setProfile: (profile: Profile | null) => void;
-  updateSettings: (settings: Partial<Settings>) => void;
+  updateSettings: (settings: Partial<Settings>) => Promise<void>;
   fetchProfile: (userId: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -42,25 +43,54 @@ export const useUserStore = create<UserState>((set) => ({
     darkTheme: true,
   },
   isLoading: true,
+  isSavingSettings: false,
   setSession: (session) => set({ session, user: session?.user || null, isLoading: false }),
   setProfile: (profile) => set({ profile }),
-  updateSettings: (newSettings) => set((state) => ({ settings: { ...state.settings, ...newSettings } })),
+  updateSettings: async (newSettings) => {
+    // Optimistic UI update
+    set((state) => ({ 
+      settings: { ...state.settings, ...newSettings },
+      isSavingSettings: true 
+    }));
+    
+    // Sync to backend
+    const { session, settings } = useUserStore.getState();
+    if (session?.user?.id) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ settings }) // Assuming a JSONB settings column
+          .eq('id', session.user.id);
+      } catch (e) {
+        console.error('Failed to sync settings to Supabase:', e);
+      } finally {
+        set({ isSavingSettings: false });
+      }
+    } else {
+      set({ isSavingSettings: false });
+    }
+  },
   fetchProfile: async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
         
       if (error) throw error;
-      set({ profile: data });
+      set({ profile: data || null });
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
   },
   signOut: async () => {
-    await supabase.auth.signOut();
-    set({ session: null, user: null, profile: null });
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Error signing out:', e);
+    } finally {
+      set({ session: null, user: null, profile: null });
+    }
   },
 }));

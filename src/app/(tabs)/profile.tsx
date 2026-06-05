@@ -1,15 +1,17 @@
 import React from 'react';
-import { View, Text, ScrollView, Switch } from 'react-native';
+import { View, Text, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { useUserStore } from '../../stores/userStore';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { LevelBadge } from '../../components/gamification/LevelBadge';
 import { getLevelFromXP, getXPProgress } from '../../utils/xpUtils';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
-  const { profile, settings, updateSettings } = useUserStore();
+  const { profile, settings, updateSettings, isSavingSettings } = useUserStore();
+  const router = useRouter();
 
   const xp = profile?.xp_total || 0;
   const level = getLevelFromXP(xp);
@@ -36,7 +38,10 @@ export default function ProfileScreen() {
       </View>
 
       <View className="mb-8">
-        <Text className="font-heading text-textPrimary text-xl mb-4">Settings</Text>
+        <View className="flex-row items-center mb-4">
+          <Text className="font-heading text-textPrimary text-xl mr-3">Settings</Text>
+          {isSavingSettings && <ActivityIndicator size="small" color="#7C3AED" />}
+        </View>
         
         <View className="bg-surface1 rounded-2xl overflow-hidden border border-white/5">
           <View className="flex-row justify-between items-center p-4 border-b border-white/5">
@@ -66,7 +71,10 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <Button title="Sign Out" variant="outlined" onPress={() => signOut()} className="mb-12" />
+      <Button title="Sign Out" variant="outlined" onPress={async () => {
+        await signOut();
+        router.replace('/(auth)');
+      }} className="mb-12" />
     </ScrollView>
   );
 }

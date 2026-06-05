@@ -12,6 +12,9 @@
     },
     "android": {
       "backgroundColor": "#0C0E14",
+      "navigationBar": {
+        "backgroundColor": "#0C0E14"
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -41,6 +44,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dab67e0e-3204-4330-9d21-8f60646f8131"
+      }
     }
   }
 }

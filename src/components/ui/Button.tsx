@@ -1,5 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, View, TouchableOpacityProps, StyleSheet, ActivityIndicator } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 export type ButtonVariant = 'filled' | 'outlined' | 'ghost' | 'gradient';
 
@@ -10,7 +12,25 @@ interface ButtonProps extends TouchableOpacityProps {
   icon?: React.ReactNode;
 }
 
-export const Button = ({ title, variant = 'filled', loading = false, icon, style, className, disabled, ...props }: ButtonProps) => {
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+
+export const Button = ({ title, variant = 'filled', loading = false, icon, style, className, disabled, onPressIn, onPressOut, ...props }: ButtonProps) => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = (e: any) => {
+    scale.value = withSpring(0.96, { damping: 15, stiffness: 200 });
+    if (onPressIn) onPressIn(e);
+  };
+
+  const handlePressOut = (e: any) => {
+    scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+    if (onPressOut) onPressOut(e);
+  };
+
   const getVariantStyles = () => {
     switch (variant) {
       case 'outlined':
@@ -18,10 +38,10 @@ export const Button = ({ title, variant = 'filled', loading = false, icon, style
       case 'ghost':
         return styles.ghost;
       case 'gradient':
-        return styles.gradient; // Note: We'd use expo-linear-gradient for real gradient, fallback here
       case 'filled':
       default:
-        return styles.filled;
+        // Background color handled by LinearGradient or base styles directly
+        return variant === 'gradient' ? {} : styles.filled;
     }
   };
 
@@ -37,19 +57,8 @@ export const Button = ({ title, variant = 'filled', loading = false, icon, style
     }
   };
 
-  return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      disabled={disabled || loading}
-      style={[
-        styles.base,
-        getVariantStyles(),
-        (disabled || loading) && styles.disabled,
-        style,
-      ]}
-      className={`rounded-xl flex-row justify-center items-center h-14 px-6 ${className || ''}`}
-      {...props}
-    >
+  const innerContent = (
+    <>
       {loading ? (
         <ActivityIndicator color={getTextColor()} />
       ) : (
@@ -60,13 +69,48 @@ export const Button = ({ title, variant = 'filled', loading = false, icon, style
           </Text>
         </View>
       )}
-    </TouchableOpacity>
+    </>
+  );
+
+  return (
+    <AnimatedTouchableOpacity
+      activeOpacity={0.8}
+      disabled={disabled || loading}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={[
+        styles.base,
+        getVariantStyles(),
+        (disabled || loading) && styles.disabled,
+        animatedStyle,
+        style,
+      ]}
+      className={`rounded-xl overflow-hidden ${variant !== 'gradient' ? 'flex-row justify-center items-center h-14 px-6' : ''} ${className || ''}`}
+      {...props}
+    >
+      {variant === 'gradient' ? (
+        <LinearGradient
+          colors={['#7C3AED', '#4F46E5']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientContainer}
+          className="flex-row justify-center items-center h-14 px-6 w-full"
+        >
+          {innerContent}
+        </LinearGradient>
+      ) : (
+        innerContent
+      )}
+    </AnimatedTouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   base: {
     minWidth: 120,
+  },
+  gradientContainer: {
+    width: '100%',
   },
   filled: {
     backgroundColor: '#7C3AED', // primary
@@ -78,14 +122,6 @@ const styles = StyleSheet.create({
   },
   ghost: {
     backgroundColor: 'transparent',
-  },
-  gradient: {
-    backgroundColor: '#7C3AED', // Fallback for gradient, we can implement LinearGradient wrapper later
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
   },
   disabled: {
     opacity: 0.5,

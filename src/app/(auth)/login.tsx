@@ -121,21 +121,11 @@ export default function LoginScreen() {
         <Button
           title="Continue with Google"
           variant="outlined"
-          className="mb-4"
+          className="mb-6"
           icon={<FontAwesome name="google" size={20} color="#F9FAFB" />}
           loading={oauthLoading === 'google'}
           disabled={!!oauthLoading || loading}
           onPress={() => handleOAuthLogin('google')}
-        />
-
-        <Button
-          title="Continue with Apple"
-          variant="outlined"
-          className="mb-6"
-          icon={<FontAwesome name="apple" size={22} color="#F9FAFB" />}
-          loading={oauthLoading === 'apple'}
-          disabled={!!oauthLoading || loading}
-          onPress={() => handleOAuthLogin('apple')}
         />
 
         <Button

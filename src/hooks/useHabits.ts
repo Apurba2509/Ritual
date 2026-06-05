@@ -32,12 +32,13 @@ export const useHabits = () => {
   // Create habit mutation
   const createHabit = useMutation({
     mutationFn: async (newHabit: NewHabit) => {
-      if (!user) throw new Error('Not authenticated');
+      const currentUser = useUserStore.getState().user || (await supabase.auth.getUser()).data.user;
+      if (!currentUser) throw new Error('Not authenticated');
       
       const habit: Habit = {
         ...newHabit,
         id: Crypto.randomUUID(),
-        user_id: user.id,
+        user_id: currentUser.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_active: true,

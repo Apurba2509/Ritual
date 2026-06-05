@@ -9,13 +9,16 @@ export default function AnalyticsScreen() {
   const { data, isLoading } = useStats();
 
   const totalCompletions = data?.totalCompletions || 0;
+  const currentStreak = data?.currentStreak || 0;
+  const longestStreak = data?.longestStreak || 0;
+  const perfectDays = data?.perfectDays || 0;
+  const currentLevel = data?.currentLevel || 1;
   
-  // Calculate perfect days or other mock stats derived from data if available
   const statsList = [
     { label: 'Total Completions', value: totalCompletions.toString(), icon: '⚡', trend: 'up' as const },
-    { label: 'Current Level', value: '1', icon: '🏅' }, // Assuming level is managed elsewhere or we update it
-    { label: 'Perfect Days', value: '0', icon: '✨', trend: 'up' as const },
-    { label: 'Longest Streak', value: '0', icon: '🔥' },
+    { label: 'Current Level', value: currentLevel.toString(), icon: '🏅' },
+    { label: 'Perfect Days', value: perfectDays.toString(), icon: '✨', trend: perfectDays > 0 ? 'up' as const : undefined },
+    { label: 'Longest Streak', value: longestStreak.toString(), icon: '🔥' },
   ];
 
   return (

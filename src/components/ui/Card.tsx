@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, ViewProps, StyleSheet } from 'react-native';
+import { ViewProps, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 interface CardProps extends ViewProps {
   elevated?: boolean;
@@ -7,7 +8,9 @@ interface CardProps extends ViewProps {
 
 export const Card = ({ elevated = false, style, className, children, ...props }: CardProps) => {
   return (
-    <View
+    <BlurView
+      intensity={20}
+      tint="dark"
       style={[
         styles.card,
         elevated && styles.elevated,
@@ -17,22 +20,21 @@ export const Card = ({ elevated = false, style, className, children, ...props }:
       {...props}
     >
       {children}
-    </View>
+    </BlurView>
   );
 };
 
-// Using StyleSheet for specific glass effects that are hard to do perfectly with just Tailwind
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
   },
   elevated: {
-    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.5,
     shadowRadius: 16,
     elevation: 8,
   },
