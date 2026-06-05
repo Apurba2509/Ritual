@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
+import { PulseRing } from '../components/animations/PulseRing';
 
 export default function RootIndex() {
   const { session, profile, isLoading } = useAuth();
@@ -8,7 +9,7 @@ export default function RootIndex() {
   if (isLoading) {
     return (
       <View className="flex-1 justify-center items-center bg-background">
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <PulseRing size={80} color="#7C3AED" />
       </View>
     );
   }

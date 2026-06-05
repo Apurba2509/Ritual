@@ -1,28 +1,44 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, withDelay } from 'react-native-reanimated';
+
+const { height } = Dimensions.get('window');
 
 export default function AuthLandingScreen() {
   const router = useRouter();
+  const translateY = useSharedValue(50);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withSpring(0, { damping: 20, stiffness: 90 });
+    opacity.value = withTiming(1, { duration: 800 });
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+      transform: [{ translateY: translateY.value }],
+    };
+  });
 
   return (
-    <View style={styles.container} className="flex-1 justify-center px-6">
-      <View className="items-center mb-16">
-        <Text className="font-hero text-textPrimary text-6xl tracking-tighter mb-4">
+    <View style={styles.container} className="flex-1 justify-between px-6 pb-12 pt-24">
+      <Animated.View style={animatedStyle} className="items-center mt-20">
+        <Text className="font-hero text-textPrimary text-6xl tracking-tighter mb-4 text-center">
           Ritual
         </Text>
-        <Text className="font-body text-textSecondary text-center text-lg max-w-xs">
+        <Text className="font-body text-textSecondary text-center text-lg max-w-xs leading-relaxed">
           Premium, focused, and deeply satisfying to interact with.
         </Text>
-      </View>
+      </Animated.View>
 
-      <Card elevated className="p-6">
+      <Animated.View style={animatedStyle} className="w-full">
         <Button
           title="Sign Up"
           variant="filled"
-          className="mb-4"
+          className="mb-4 shadow-lg shadow-primary/20"
           onPress={() => router.push('/(auth)/signup')}
         />
         <Button
@@ -30,7 +46,7 @@ export default function AuthLandingScreen() {
           variant="ghost"
           onPress={() => router.push('/(auth)/login')}
         />
-      </Card>
+      </Animated.View>
     </View>
   );
 }

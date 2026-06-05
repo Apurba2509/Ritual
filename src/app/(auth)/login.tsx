@@ -6,6 +6,7 @@ import * as Linking from 'expo-linking';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { supabase } from '../../lib/supabase';
+import { FontAwesome } from '@expo/vector-icons';
 
 // Required for web browser auth flow
 WebBrowser.maybeCompleteAuthSession();
@@ -36,6 +37,8 @@ export default function LoginScreen() {
       } else {
         setErrorMessage(error.message);
       }
+    } else {
+      router.replace('/(tabs)');
     }
   };
 
@@ -57,6 +60,7 @@ export default function LoginScreen() {
         const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
         if (res.type === 'success') {
           // Supabase auth listener handles session extraction from URL automatically
+          router.replace('/(tabs)');
         }
       }
     } catch (error: any) {
@@ -118,6 +122,7 @@ export default function LoginScreen() {
           title="Continue with Google"
           variant="outlined"
           className="mb-4"
+          icon={<FontAwesome name="google" size={20} color="#F9FAFB" />}
           loading={oauthLoading === 'google'}
           disabled={!!oauthLoading || loading}
           onPress={() => handleOAuthLogin('google')}
@@ -127,6 +132,7 @@ export default function LoginScreen() {
           title="Continue with Apple"
           variant="outlined"
           className="mb-6"
+          icon={<FontAwesome name="apple" size={22} color="#F9FAFB" />}
           loading={oauthLoading === 'apple'}
           disabled={!!oauthLoading || loading}
           onPress={() => handleOAuthLogin('apple')}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, TouchableOpacityProps, StyleSheet, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, View, TouchableOpacityProps, StyleSheet, ActivityIndicator } from 'react-native';
 
 export type ButtonVariant = 'filled' | 'outlined' | 'ghost' | 'gradient';
 
@@ -7,9 +7,10 @@ interface ButtonProps extends TouchableOpacityProps {
   title: string;
   variant?: ButtonVariant;
   loading?: boolean;
+  icon?: React.ReactNode;
 }
 
-export const Button = ({ title, variant = 'filled', loading = false, style, className, disabled, ...props }: ButtonProps) => {
+export const Button = ({ title, variant = 'filled', loading = false, icon, style, className, disabled, ...props }: ButtonProps) => {
   const getVariantStyles = () => {
     switch (variant) {
       case 'outlined':
@@ -52,9 +53,12 @@ export const Button = ({ title, variant = 'filled', loading = false, style, clas
       {loading ? (
         <ActivityIndicator color={getTextColor()} />
       ) : (
-        <Text style={[styles.text, { color: getTextColor() }]} className="font-heading">
-          {title}
-        </Text>
+        <View className="flex-row items-center justify-center">
+          {icon && <View className="mr-2">{icon}</View>}
+          <Text style={[styles.text, { color: getTextColor() }]} className="font-heading">
+            {title}
+          </Text>
+        </View>
       )}
     </TouchableOpacity>
   );
