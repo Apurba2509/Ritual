@@ -13,13 +13,21 @@ interface Profile {
   onboarding_completed: boolean;
 }
 
+interface Settings {
+  morningBrief: boolean;
+  streakWarning: boolean;
+  darkTheme: boolean;
+}
+
 interface UserState {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  settings: Settings;
   isLoading: boolean;
   setSession: (session: Session | null) => void;
   setProfile: (profile: Profile | null) => void;
+  updateSettings: (settings: Partial<Settings>) => void;
   fetchProfile: (userId: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -28,9 +36,15 @@ export const useUserStore = create<UserState>((set) => ({
   session: null,
   user: null,
   profile: null,
+  settings: {
+    morningBrief: true,
+    streakWarning: true,
+    darkTheme: true,
+  },
   isLoading: true,
   setSession: (session) => set({ session, user: session?.user || null, isLoading: false }),
   setProfile: (profile) => set({ profile }),
+  updateSettings: (newSettings) => set((state) => ({ settings: { ...state.settings, ...newSettings } })),
   fetchProfile: async (userId: string) => {
     try {
       const { data, error } = await supabase

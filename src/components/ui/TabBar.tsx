@@ -3,19 +3,20 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-nati
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
-// Simple placeholder for icons. We can integrate expo-symbols or equivalent later.
+import { Feather } from '@expo/vector-icons';
+
 const getIconName = (routeName: string) => {
   switch (routeName) {
     case 'index':
-      return 'Today';
+      return 'calendar';
     case 'analytics':
-      return 'Stats';
+      return 'bar-chart-2';
     case 'social':
-      return 'Social';
+      return 'users';
     case 'profile':
-      return 'Profile';
+      return 'user';
     default:
-      return 'Tab';
+      return 'circle';
   }
 };
 
@@ -78,15 +79,12 @@ export const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) =>
             style={styles.tabItem}
             activeOpacity={1}
           >
-            <Text
-              style={[
-                styles.tabText,
-                { color: isFocused ? '#FFFFFF' : '#9CA3AF' },
-              ]}
-              className="font-stat"
-            >
-              {getIconName(route.name)}
-            </Text>
+            <Feather
+              name={getIconName(route.name) as any}
+              size={24}
+              color={isFocused ? '#FFFFFF' : '#9CA3AF'}
+              style={styles.tabIcon}
+            />
           </TouchableOpacity>
         );
       })}
@@ -113,8 +111,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 2,
   },
-  tabText: {
-    marginTop: 4,
+  tabIcon: {
+    marginTop: 0,
   },
   indicatorContainer: {
     position: 'absolute',

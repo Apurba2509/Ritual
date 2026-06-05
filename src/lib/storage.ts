@@ -25,5 +25,5 @@ export const setStorageItem = <T>(key: string, value: T): void => {
 };
 
 export const removeStorageItem = (key: string): void => {
-  storage.delete(key);
+  storage.remove(key);
 };

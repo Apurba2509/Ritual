@@ -15,7 +15,7 @@ const zustandStorage = {
     return value ?? null;
   },
   removeItem: (name: string) => {
-    return storage.delete(name);
+    return storage.remove(name);
   },
 };
 

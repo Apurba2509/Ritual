@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -16,24 +16,33 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = async () => {
     if (!email || !password) return;
     setLoading(true);
+    setErrorMessage(null);
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    
     setLoading(false);
 
     if (error) {
-      Alert.alert('Login Failed', error.message);
+      if (error.message.includes('Email not confirmed')) {
+        setErrorMessage('Please verify your email address before logging in.');
+      } else {
+        setErrorMessage(error.message);
+      }
     }
   };
 
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
     try {
       setOauthLoading(provider);
+      setErrorMessage(null);
       const redirectUrl = Linking.createURL('/(tabs)');
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -51,7 +60,7 @@ export default function LoginScreen() {
         }
       }
     } catch (error: any) {
-      Alert.alert(`${provider} Login Failed`, error.message);
+      setErrorMessage(`${provider} login is not fully configured yet. Please use Email/Password.`);
     } finally {
       setOauthLoading(null);
     }
@@ -68,11 +77,17 @@ export default function LoginScreen() {
           <Text className="font-body text-textSecondary text-base">Your streak is waiting for you.</Text>
         </View>
 
+        {errorMessage && (
+          <View className="bg-danger/10 p-4 rounded-xl mb-6 border border-danger/20">
+            <Text className="text-danger font-body text-sm text-center">{errorMessage}</Text>
+          </View>
+        )}
+
         <Input
           label="Email"
           placeholder="Enter your email"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => { setEmail(text); setErrorMessage(null); }}
           autoCapitalize="none"
           keyboardType="email-address"
         />
@@ -81,7 +96,7 @@ export default function LoginScreen() {
           label="Password"
           placeholder="Enter your password"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(text) => { setPassword(text); setErrorMessage(null); }}
           secureTextEntry
         />
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -17,10 +17,13 @@ export default function SignupScreen() {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSignup = async () => {
     if (!email || !password || !username) return;
     setLoading(true);
+    setErrorMessage(null);
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -30,15 +33,20 @@ export default function SignupScreen() {
         }
       }
     });
+    
     setLoading(false);
 
     if (error) {
-      Alert.alert('Signup Failed', error.message);
+      setErrorMessage(error.message);
     } else {
       if (data.session) {
-        // Logged in
+        // Logged in directly (if email confirmation is turned off)
       } else {
-        Alert.alert('Success', 'Please check your email to verify your account.');
+        // Redirect to verify email screen
+        router.push({
+          pathname: '/(auth)/verify-email',
+          params: { email }
+        });
       }
     }
   };
@@ -46,6 +54,7 @@ export default function SignupScreen() {
   const handleOAuthLogin = async (provider: 'google' | 'apple') => {
     try {
       setOauthLoading(provider);
+      setErrorMessage(null);
       const redirectUrl = Linking.createURL('/(tabs)');
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -63,7 +72,7 @@ export default function SignupScreen() {
         }
       }
     } catch (error: any) {
-      Alert.alert(`${provider} Login Failed`, error.message);
+      setErrorMessage(`${provider} signup is not fully configured yet. Please use Email/Password.`);
     } finally {
       setOauthLoading(null);
     }
@@ -80,11 +89,17 @@ export default function SignupScreen() {
           <Text className="font-body text-textSecondary text-base">Start building your Ritual today.</Text>
         </View>
 
+        {errorMessage && (
+          <View className="bg-danger/10 p-4 rounded-xl mb-6 border border-danger/20">
+            <Text className="text-danger font-body text-sm text-center">{errorMessage}</Text>
+          </View>
+        )}
+
         <Input
           label="Username"
           placeholder="Choose a unique username"
           value={username}
-          onChangeText={setUsername}
+          onChangeText={(text) => { setUsername(text); setErrorMessage(null); }}
           autoCapitalize="none"
         />
 
@@ -92,7 +107,7 @@ export default function SignupScreen() {
           label="Email"
           placeholder="Enter your email"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => { setEmail(text); setErrorMessage(null); }}
           autoCapitalize="none"
           keyboardType="email-address"
         />
@@ -101,7 +116,7 @@ export default function SignupScreen() {
           label="Password"
           placeholder="Create a password"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(text) => { setPassword(text); setErrorMessage(null); }}
           secureTextEntry
         />
 

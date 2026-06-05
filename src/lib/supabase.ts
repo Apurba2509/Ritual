@@ -2,10 +2,11 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import { createMMKV } from 'react-native-mmkv';
 
-// @ts-ignore
 const storage = createMMKV({
   id: 'supabase-auth-storage'
 });
+
+
 
 const mmkvStorageAdapter = {
   getItem: (key: string) => {
@@ -16,7 +17,13 @@ const mmkvStorageAdapter = {
     storage.set(key, value);
   },
   removeItem: (key: string) => {
-    storage.delete(key);
+    if (typeof (storage as any).remove === 'function') {
+      (storage as any).remove(key);
+    } else if (typeof (storage as any).delete === 'function') {
+      (storage as any).delete(key);
+    } else if (typeof (storage as any).removeItem === 'function') {
+      (storage as any).removeItem(key);
+    }
   },
 };
 

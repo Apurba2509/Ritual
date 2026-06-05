@@ -9,7 +9,7 @@ import { getLevelFromXP, getXPProgress } from '../../utils/xpUtils';
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
-  const { profile } = useUserStore();
+  const { profile, settings, updateSettings } = useUserStore();
 
   const xp = profile?.xp_total || 0;
   const level = getLevelFromXP(xp);
@@ -18,9 +18,9 @@ export default function ProfileScreen() {
   return (
     <ScrollView className="flex-1 bg-background pt-16 px-4">
       <View className="flex-row items-center mb-8">
-        <Avatar name={profile?.username || 'User'} size={80} />
+        <Avatar name={profile?.username || profile?.display_name || 'User'} size={80} />
         <View className="ml-4 flex-1">
-          <Text className="font-heading text-textPrimary text-2xl">{profile?.username || 'Ritual Member'}</Text>
+          <Text className="font-heading text-textPrimary text-2xl">{profile?.username || profile?.display_name || 'Ritual Member'}</Text>
         </View>
         <LevelBadge level={level} size={56} />
       </View>
@@ -41,20 +41,32 @@ export default function ProfileScreen() {
         <View className="bg-surface1 rounded-2xl overflow-hidden border border-white/5">
           <View className="flex-row justify-between items-center p-4 border-b border-white/5">
             <Text className="font-body text-textPrimary">Morning Brief Notification</Text>
-            <Switch value={true} trackColor={{ false: '#374151', true: '#7C3AED' }} />
+            <Switch 
+              value={settings?.morningBrief ?? true} 
+              onValueChange={(val) => updateSettings({ morningBrief: val })}
+              trackColor={{ false: '#374151', true: '#7C3AED' }} 
+            />
           </View>
           <View className="flex-row justify-between items-center p-4 border-b border-white/5">
             <Text className="font-body text-textPrimary">Streak at Risk Warning</Text>
-            <Switch value={true} trackColor={{ false: '#374151', true: '#7C3AED' }} />
+            <Switch 
+              value={settings?.streakWarning ?? true} 
+              onValueChange={(val) => updateSettings({ streakWarning: val })}
+              trackColor={{ false: '#374151', true: '#7C3AED' }} 
+            />
           </View>
           <View className="flex-row justify-between items-center p-4">
             <Text className="font-body text-textPrimary">Dark Theme</Text>
-            <Switch value={true} trackColor={{ false: '#374151', true: '#7C3AED' }} disabled />
+            <Switch 
+              value={settings?.darkTheme ?? true} 
+              onValueChange={(val) => updateSettings({ darkTheme: val })}
+              trackColor={{ false: '#374151', true: '#7C3AED' }} 
+            />
           </View>
         </View>
       </View>
 
-      <Button title="Sign Out" variant="outlined" onPress={signOut} className="mb-12" />
+      <Button title="Sign Out" variant="outlined" onPress={() => signOut()} className="mb-12" />
     </ScrollView>
   );
 }
