@@ -15,6 +15,8 @@ import { useRealtime } from '../hooks/useRealtime';
 registerBackgroundTasks();
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { NavigationBar } from 'expo-navigation-bar';
+import { Platform } from 'react-native';
 
 export default function RootLayout() {
   // Connect to realtime feed globally
@@ -28,7 +30,8 @@ export default function RootLayout() {
   });
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0C0E14' }}>
+      {Platform.OS === 'android' && <NavigationBar style="light" />}
       <QueryClientProvider client={queryClient}>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0C0E14' } }}>
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />

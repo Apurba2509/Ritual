@@ -37,8 +37,8 @@ export default function AuthLandingScreen() {
       <Animated.View style={animatedStyle} className="w-full">
         <Button
           title="Sign Up"
-          variant="filled"
-          className="mb-4 shadow-lg shadow-primary/20"
+          variant="gradient"
+          className="mb-6 shadow-lg shadow-primary/20"
           onPress={() => router.push('/(auth)/signup')}
         />
         <Button

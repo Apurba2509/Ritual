@@ -47,25 +47,25 @@ export default function ProfileScreen() {
           {isSavingSettings && <ActivityIndicator size="small" color="#7C3AED" />}
         </View>
         
-        <View className="bg-surface1 rounded-2xl overflow-hidden border border-white/5">
-          <View className="flex-row justify-between items-center p-4 border-b border-white/5">
-            <Text className="font-body text-textPrimary">Morning Brief Notification</Text>
+        <View className="bg-surface1 rounded-3xl overflow-hidden border border-white/5 shadow-lg">
+          <View className="flex-row justify-between items-center p-5 border-b border-white/5">
+            <Text className="font-body text-textPrimary text-base">Morning Brief Notification</Text>
             <Switch 
               value={settings?.morningBrief ?? true} 
               onValueChange={(val) => updateSettings({ morningBrief: val })}
               trackColor={{ false: '#374151', true: '#7C3AED' }} 
             />
           </View>
-          <View className="flex-row justify-between items-center p-4 border-b border-white/5">
-            <Text className="font-body text-textPrimary">Streak at Risk Warning</Text>
+          <View className="flex-row justify-between items-center p-5 border-b border-white/5">
+            <Text className="font-body text-textPrimary text-base">Streak at Risk Warning</Text>
             <Switch 
               value={settings?.streakWarning ?? true} 
               onValueChange={(val) => updateSettings({ streakWarning: val })}
               trackColor={{ false: '#374151', true: '#7C3AED' }} 
             />
           </View>
-          <View className="flex-row justify-between items-center p-4">
-            <Text className="font-body text-textPrimary">Dark Theme</Text>
+          <View className="flex-row justify-between items-center p-5">
+            <Text className="font-body text-textPrimary text-base">Dark Theme</Text>
             <Switch 
               value={settings?.darkTheme ?? true} 
               onValueChange={(val) => updateSettings({ darkTheme: val })}

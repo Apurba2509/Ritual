@@ -12,9 +12,6 @@
     },
     "android": {
       "backgroundColor": "#0C0E14",
-      "navigationBar": {
-        "backgroundColor": "#0C0E14"
-      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

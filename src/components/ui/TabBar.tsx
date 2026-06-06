@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Feather } from '@expo/vector-icons';
 
@@ -27,7 +27,7 @@ export const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) =>
   // Animated style for the sliding indicator pill
   const indicatorStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateX: withSpring(state.index * TAB_WIDTH, { damping: 20, stiffness: 200 }) }],
+      transform: [{ translateX: withTiming(state.index * TAB_WIDTH, { duration: 200 }) }],
       width: TAB_WIDTH,
     };
   });

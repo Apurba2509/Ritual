@@ -53,12 +53,13 @@ const styles = StyleSheet.create({
     color: '#9CA3AF', // textSecondary
   },
   inputContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)', // border
+    backgroundColor: '#1E2333',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   inputFocused: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)', // surface1
+    backgroundColor: 'rgba(124, 58, 237, 0.05)', // surface1
     borderColor: '#7C3AED', // primary
   },
   inputError: {

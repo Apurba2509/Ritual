@@ -76,53 +76,55 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View className="flex-1 justify-center px-6">
-        <View className="mb-10">
+        <View className="mb-12">
           <Text className="font-heading text-textPrimary text-4xl mb-2">Welcome Back</Text>
           <Text className="font-body text-textSecondary text-base">Your streak is waiting for you.</Text>
         </View>
 
         {errorMessage && (
-          <View className="bg-danger/10 p-4 rounded-xl mb-6 border border-danger/20">
+          <View className="bg-danger/10 p-4 rounded-xl mb-8 border border-danger/20">
             <Text className="text-danger font-body text-sm text-center">{errorMessage}</Text>
           </View>
         )}
 
-        <Input
-          label="Email"
-          placeholder="Enter your email"
-          value={email}
-          onChangeText={(text) => { setEmail(text); setErrorMessage(null); }}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
+        <View className="space-y-4 mb-8">
+          <Input
+            label="Email"
+            placeholder="Enter your email"
+            value={email}
+            onChangeText={(text) => { setEmail(text); setErrorMessage(null); }}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
 
-        <Input
-          label="Password"
-          placeholder="Enter your password"
-          value={password}
-          onChangeText={(text) => { setPassword(text); setErrorMessage(null); }}
-          secureTextEntry
-        />
+          <Input
+            label="Password"
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={(text) => { setPassword(text); setErrorMessage(null); }}
+            secureTextEntry
+          />
+        </View>
 
         <Button
           title="Log In"
           variant="gradient"
-          className="mt-6"
+          className="w-full"
           loading={loading && !oauthLoading}
           disabled={!email || !password || !!oauthLoading}
           onPress={handleLogin}
         />
 
-        <View className="my-6 flex-row items-center justify-center">
-          <View className="flex-1 h-[1px] bg-white/10" />
-          <Text className="text-textSecondary mx-4">OR</Text>
-          <View className="flex-1 h-[1px] bg-white/10" />
+        <View className="my-8 flex-row items-center justify-center opacity-50">
+          <View className="flex-1 h-[1px] bg-white" />
+          <Text className="text-white font-stat text-xs tracking-widest mx-4">OR</Text>
+          <View className="flex-1 h-[1px] bg-white" />
         </View>
 
         <Button
           title="Continue with Google"
           variant="outlined"
-          className="mb-6"
+          className="mb-8 w-full"
           icon={<FontAwesome name="google" size={20} color="#F9FAFB" />}
           loading={oauthLoading === 'google'}
           disabled={!!oauthLoading || loading}

@@ -22,12 +22,12 @@ export const Button = ({ title, variant = 'filled', loading = false, icon, style
   }));
 
   const handlePressIn = (e: any) => {
-    scale.value = withSpring(0.96, { damping: 15, stiffness: 200 });
+    scale.value = withTiming(0.96, { duration: 100 });
     if (onPressIn) onPressIn(e);
   };
 
   const handlePressOut = (e: any) => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+    scale.value = withTiming(1, { duration: 150 });
     if (onPressOut) onPressOut(e);
   };
 
@@ -84,8 +84,9 @@ export const Button = ({ title, variant = 'filled', loading = false, icon, style
         (disabled || loading) && styles.disabled,
         animatedStyle,
         style,
+        { height: 56 } // Explicit height to fix gradient squashing
       ]}
-      className={`rounded-xl overflow-hidden ${variant !== 'gradient' ? 'flex-row justify-center items-center h-14 px-6' : ''} ${className || ''}`}
+      className={`rounded-xl overflow-hidden ${variant !== 'gradient' ? 'flex-row justify-center items-center px-6' : ''} ${className || ''}`}
       {...props}
     >
       {variant === 'gradient' ? (
@@ -93,8 +94,7 @@ export const Button = ({ title, variant = 'filled', loading = false, icon, style
           colors={['#7C3AED', '#4F46E5']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.gradientContainer}
-          className="flex-row justify-center items-center h-14 px-6 w-full"
+          style={[styles.gradientContainer, { height: 56, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }]}
         >
           {innerContent}
         </LinearGradient>
