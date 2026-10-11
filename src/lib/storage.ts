@@ -1,29 +1,26 @@
 import { createMMKV } from 'react-native-mmkv';
+import type { StateStorage } from 'zustand/middleware';
 
-// Create a unified app storage
-export const storage = createMMKV({
-  id: 'ritual-app-storage',
-  encryptionKey: 'ritual-super-secure-key' // In a real app, securely generate and store this
-});
+/**
+ * MMKV is a synchronous, memory-mapped key-value store (~30× faster than AsyncStorage).
+ * Synchronous reads mean the app state is hydrated before the first frame — no loading
+ * flash, no "empty list then data" flicker.
+ */
+export const storage = createMMKV({ id: 'ritual' });
 
-export const getStorageItem = <T>(key: string): T | null => {
-  const value = storage.getString(key);
-  if (!value) return null;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return value as any as T;
-  }
+export const zustandStorage: StateStorage = {
+  getItem: (name) => storage.getString(name) ?? null,
+  setItem: (name, value) => storage.set(name, value),
+  removeItem: (name) => {
+    storage.remove(name);
+  },
 };
 
-export const setStorageItem = <T>(key: string, value: T): void => {
-  if (typeof value === 'string') {
-    storage.set(key, value);
-  } else {
-    storage.set(key, JSON.stringify(value));
-  }
-};
-
-export const removeStorageItem = (key: string): void => {
-  storage.remove(key);
+/** Async facade used by Firebase Auth's React Native persistence. */
+export const asyncKV = {
+  getItem: async (key: string) => storage.getString(key) ?? null,
+  setItem: async (key: string, value: string) => storage.set(key, value),
+  removeItem: async (key: string) => {
+    storage.remove(key);
+  },
 };

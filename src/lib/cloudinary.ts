@@ -1,41 +1,41 @@
-export async function uploadToCloudinary(
-  uri: string,
-  folder: 'checkins' | 'avatars' | 'voice'
-): Promise<string> {
-  const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
-  const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+import { Platform } from 'react-native';
 
-  if (!CLOUD_NAME || !UPLOAD_PRESET) {
-    console.warn("Cloudinary env vars missing. Returning mock URL.");
-    return uri; // Return local uri as fallback
+/**
+ * Photo uploads go straight from the device to Cloudinary using an *unsigned* upload
+ * preset (no API secret in the app). The preset should restrict formats, size and folder.
+ */
+
+const CLOUD = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
+const PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+export const cloudinaryConfigured = !!(CLOUD && PRESET);
+
+export async function uploadImage(uri: string, folder: 'checkins' | 'avatars'): Promise<string> {
+  if (!cloudinaryConfigured) throw new Error('Photo uploads are not configured.');
+  const form = new FormData();
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(uri)).blob();
+    form.append('file', blob, 'photo.jpg');
+  } else {
+    // React Native's FormData accepts { uri, name, type } file descriptors.
+    form.append('file', { uri, name: 'photo.jpg', type: 'image/jpeg' } as unknown as Blob);
   }
+  form.append('upload_preset', PRESET!);
+  form.append('folder', `ritual/${folder}`);
 
-  const formData = new FormData();
-  
-  // Use any to bypass TS error with FormData append for React Native files
-  formData.append('file', {
-    uri,
-    type: 'image/jpeg',
-    name: 'upload.jpg',
-  } as any);
-  
-  formData.append('upload_preset', UPLOAD_PRESET);
-  formData.append('folder', folder);
-
-  try {
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-    
-    if (!res.ok) {
-      throw new Error('Upload failed');
-    }
-
-    const data = await res.json();
-    return data.secure_url;
-  } catch (error) {
-    console.error("Cloudinary upload error:", error);
-    throw error;
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`, { method: 'POST', body: form });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg: string = json?.error?.message ?? `Upload failed (${res.status})`;
+    if (/preset/i.test(msg))
+      throw new Error('Cloudinary upload preset not found or not unsigned. See README → Cloudinary.');
+    throw new Error(msg);
   }
+  return json.secure_url as string;
+}
+
+/** Cloudinary on-the-fly transformation for thumbnails (saves bandwidth). */
+export function thumb(url: string, size = 240): string {
+  if (!url.includes('/upload/')) return url;
+  return url.replace('/upload/', `/upload/c_fill,g_auto,w_${size},h_${size},q_auto,f_auto/`);
 }

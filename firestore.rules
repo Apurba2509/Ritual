@@ -1,0 +1,158 @@
+rules_version = '2';
+
+// Ritual — Firestore security rules
+// ────────────────────────────────
+// • users/{uid}/**          private: only the owner can read/write (habits, entries, inbox reads)
+// • profiles/{uid}          public to signed-in users, writable only by the owner (validated shape)
+// • usernames/{name}        one-claim-per-name registry (anyone can check availability)
+// • friendships/{a_b}       both members can read; requester creates "pending", addressee accepts
+// • activity/{id}           readable by signed-in users; others may only add/remove their own kudos
+// • challenges/{id}         public read; creator edits; members join/leave by ±1 counter
+// • users/{uid}/inbox/{id}  friends can drop nudges/kudos in; owner reads & marks read
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isUser(uid) { return signedIn() && request.auth.uid == uid; }
+    function pair(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
+    function friends(a, b) {
+      let f = /databases/$(database)/documents/friendships/$(pair(a, b));
+      return exists(f) && get(f).data.status == 'accepted';
+    }
+    function onlyChanged(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function avatarOk(a) {
+      return a is map && a.emoji is string && a.emoji.size() <= 16 && a.color is string && a.color.size() <= 9;
+    }
+
+    // ── Private user data ──────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read, write: if isUser(uid);
+
+      match /habits/{habitId} {
+        allow read, delete: if isUser(uid);
+        allow create, update: if isUser(uid)
+          && request.resource.data.id == habitId
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 80
+          && request.resource.data.updatedAt is number;
+      }
+
+      match /entries/{entryId} {
+        allow read, delete: if isUser(uid);
+        allow create, update: if isUser(uid)
+          && request.resource.data.id == entryId
+          && request.resource.data.date is string
+          && request.resource.data.value is number
+          && request.resource.data.value >= 0
+          && request.resource.data.updatedAt is number;
+      }
+
+      match /inbox/{itemId} {
+        allow read, delete: if isUser(uid);
+        allow update: if isUser(uid) && onlyChanged(['read']);
+        allow create: if signedIn()
+          && request.auth.uid != uid
+          && request.resource.data.from == request.auth.uid
+          && request.resource.data.type in ['nudge', 'kudos', 'friend_accepted']
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 200
+          && (friends(request.auth.uid, uid) || request.resource.data.type == 'kudos');
+      }
+    }
+
+    // ── Public profiles (leaderboards, friend cards) ───────────────────────
+    match /profiles/{uid} {
+      allow read: if signedIn();
+      allow delete: if isUser(uid);
+      allow create, update: if isUser(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.username is string
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 60
+        && avatarOk(request.resource.data.avatar)
+        && request.resource.data.xp is number
+        && request.resource.data.level is number;
+    }
+
+    // ── Username registry ─────────────────────────────────────────────────
+    match /usernames/{name} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && name.matches('^[a-z0-9_.]{3,20}$')
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ── Friendships ───────────────────────────────────────────────────────
+    match /friendships/{id} {
+      // Either member may look up the pair doc — including before it exists (request flow checks first).
+      allow get: if signedIn() && (
+        (resource == null && request.auth.uid in id.split('_'))
+        || (resource != null && request.auth.uid in resource.data.uids)
+      );
+      allow list: if signedIn() && request.auth.uid in resource.data.uids;
+      allow create: if signedIn()
+        && request.resource.data.requester == request.auth.uid
+        && request.resource.data.uids.size() == 2
+        && request.auth.uid in request.resource.data.uids
+        && request.resource.data.status == 'pending'
+        && id == pair(request.resource.data.uids[0], request.resource.data.uids[1]);
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.uids
+        && request.auth.uid != resource.data.requester
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && onlyChanged(['status', 'updatedAt']);
+      allow delete: if signedIn() && request.auth.uid in resource.data.uids;
+    }
+
+    // ── Activity feed ─────────────────────────────────────────────────────
+    match /activity/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 200
+        && request.resource.data.kudos.size() == 0;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      // Anyone signed in may add or remove *their own* kudos and nothing else.
+      allow update: if signedIn()
+        && onlyChanged(['kudos'])
+        && request.resource.data.kudos.toSet().difference(resource.data.kudos.toSet()).hasOnly([request.auth.uid])
+        && resource.data.kudos.toSet().difference(request.resource.data.kudos.toSet()).hasOnly([request.auth.uid]);
+    }
+
+    // ── Challenges ────────────────────────────────────────────────────────
+    match /challenges/{cid} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 60
+        && request.resource.data.durationDays is number
+        && request.resource.data.durationDays > 0
+        && request.resource.data.durationDays <= 366
+        && request.resource.data.memberCount == 0;
+      allow update: if signedIn() && (
+        (resource.data.creatorUid == request.auth.uid && !('memberCount' in request.resource.data.diff(resource.data).affectedKeys()))
+        || (onlyChanged(['memberCount'])
+            && (request.resource.data.memberCount == resource.data.memberCount + 1
+                || request.resource.data.memberCount == resource.data.memberCount - 1))
+      );
+      allow delete: if signedIn() && resource.data.creatorUid == request.auth.uid;
+
+      match /members/{uid} {
+        allow read: if signedIn();
+        allow create, update: if isUser(uid)
+          && request.resource.data.daysDone is number
+          && avatarOk(request.resource.data.avatar);
+        allow delete: if isUser(uid);
+      }
+    }
+  }
+}
