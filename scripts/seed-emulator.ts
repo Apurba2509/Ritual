@@ -47,7 +47,7 @@ connectFirestoreEmulator(db, '127.0.0.1', 8085);
 
 type Spec = Pick<
   Habit,
-  'name' | 'emoji' | 'color' | 'kind' | 'target' | 'unit' | 'schedule' | 'difficulty' | 'category'
+  'name' | 'icon' | 'color' | 'kind' | 'target' | 'unit' | 'schedule' | 'difficulty' | 'category'
 > & {
   rate: number;
   reminders?: string[];
@@ -68,13 +68,13 @@ const PEOPLE: Person[] = [
     email: 'demo@ritual.dev',
     username: 'demo',
     displayName: 'Apurba',
-    avatar: { emoji: '🔥', color: '#FF6A3D' },
+    avatar: { emoji: '', color: 'coral' },
     bio: 'Shipping code and habits daily.',
     habits: [
       {
-        name: 'Code every day',
-        emoji: '👨‍💻',
-        color: '#14B8A6',
+        name: 'Ship code',
+        icon: 'git-commit',
+        color: 'lime',
         kind: 'check',
         target: 1,
         unit: null,
@@ -86,8 +86,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Solve a LeetCode problem',
-        emoji: '🧩',
-        color: '#F59E0B',
+        icon: 'puzzle-piece',
+        color: 'peach',
         kind: 'count',
         target: 1,
         unit: 'problems',
@@ -99,8 +99,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Walk 8,000 steps',
-        emoji: '🚶',
-        color: '#22C55E',
+        icon: 'footprints',
+        color: 'mint',
         kind: 'count',
         target: 8000,
         unit: 'steps',
@@ -111,8 +111,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Meditate',
-        emoji: '🧘',
-        color: '#8B5CF6',
+        icon: 'flower-lotus',
+        color: 'lilac',
         kind: 'duration',
         target: 10,
         unit: 'min',
@@ -124,8 +124,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Work out',
-        emoji: '🏋️',
-        color: '#FF6A3D',
+        icon: 'barbell',
+        color: 'coral',
         kind: 'duration',
         target: 30,
         unit: 'min',
@@ -136,8 +136,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Read',
-        emoji: '📖',
-        color: '#3B82F6',
+        icon: 'book-open-text',
+        color: 'butter',
         kind: 'count',
         target: 20,
         unit: 'pages',
@@ -152,13 +152,13 @@ const PEOPLE: Person[] = [
     email: 'maya@ritual.dev',
     username: 'maya',
     displayName: 'Maya',
-    avatar: { emoji: '🌸', color: '#D946EF' },
+    avatar: { emoji: '', color: 'rose' },
     bio: 'Marathon in March 🏃‍♀️',
     habits: [
       {
         name: 'Go for a run',
-        emoji: '🏃',
-        color: '#FF6A3D',
+        icon: 'person-simple-run',
+        color: 'coral',
         kind: 'check',
         target: 1,
         unit: null,
@@ -169,8 +169,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Drink water',
-        emoji: '💧',
-        color: '#06B6D4',
+        icon: 'drop',
+        color: 'sky',
         kind: 'count',
         target: 8,
         unit: 'glasses',
@@ -181,8 +181,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Stretch',
-        emoji: '🤸',
-        color: '#22C55E',
+        icon: 'person-simple-tai-chi',
+        color: 'mint',
         kind: 'duration',
         target: 10,
         unit: 'min',
@@ -197,13 +197,13 @@ const PEOPLE: Person[] = [
     email: 'rohan@ritual.dev',
     username: 'rohan',
     displayName: 'Rohan',
-    avatar: { emoji: '🚀', color: '#3B82F6' },
+    avatar: { emoji: '', color: 'butter' },
     bio: 'DSA grind until offer letter.',
     habits: [
       {
         name: 'Solve a LeetCode problem',
-        emoji: '🧩',
-        color: '#F59E0B',
+        icon: 'puzzle-piece',
+        color: 'peach',
         kind: 'count',
         target: 2,
         unit: 'problems',
@@ -213,9 +213,9 @@ const PEOPLE: Person[] = [
         rate: 0.85,
       },
       {
-        name: 'Code every day',
-        emoji: '👨‍💻',
-        color: '#14B8A6',
+        name: 'Ship code',
+        icon: 'git-commit',
+        color: 'lime',
         kind: 'check',
         target: 1,
         unit: null,
@@ -226,8 +226,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Sleep 7+ hours',
-        emoji: '😴',
-        color: '#6366F1',
+        icon: 'moon-stars',
+        color: 'lilac',
         kind: 'duration',
         target: 420,
         unit: 'min',
@@ -242,13 +242,13 @@ const PEOPLE: Person[] = [
     email: 'kenji@ritual.dev',
     username: 'kenji',
     displayName: 'Kenji',
-    avatar: { emoji: '🍵', color: '#84CC16' },
+    avatar: { emoji: '', color: 'mint' },
     bio: 'Slow and steady.',
     habits: [
       {
         name: 'Journal',
-        emoji: '✍️',
-        color: '#D946EF',
+        icon: 'pencil-line',
+        color: 'rose',
         kind: 'check',
         target: 1,
         unit: null,
@@ -259,8 +259,8 @@ const PEOPLE: Person[] = [
       },
       {
         name: 'Practice Japanese',
-        emoji: '🗣️',
-        color: '#84CC16',
+        icon: 'translate',
+        color: 'mint',
         kind: 'duration',
         target: 15,
         unit: 'min',
@@ -293,7 +293,7 @@ function buildHistory(uid: string, specs: Spec[]) {
   const habits: Habit[] = specs.map((s, i) => ({
     id: `${uid.slice(0, 6)}h${i}`,
     name: s.name,
-    emoji: s.emoji,
+    icon: s.icon,
     color: s.color,
     kind: s.kind,
     target: s.target,
@@ -477,14 +477,14 @@ async function main() {
 
   // Activity feed posts
   const posts: [string, string, string, number][] = [
-    ['maya', '🏃', 'hit a 21-day streak on Go for a run', 3],
-    ['rohan', '🧩', 'unlocked “Unbreakable”', 7],
-    ['maya', '⚡', 'reached level 9', 20],
-    ['rohan', '🌟', 'completed 7 perfect days in a row', 30],
-    ['demo', '👨‍💻', 'hit a 30-day streak on Code every day', 50],
-    ['kenji', '🗣️', 'joined the "30 Days of Code" challenge', 90],
+    ['maya', 'milestone', 'hit a 21-day streak on Go for a run', 3],
+    ['rohan', 'achievement', 'unlocked “Unbreakable”', 7],
+    ['maya', 'level', 'reached level 9', 20],
+    ['rohan', 'perfect', 'completed 7 perfect days in a row', 30],
+    ['demo', 'milestone', 'hit a 30-day streak on Ship code', 50],
+    ['kenji', 'challenge_join', 'joined the "30 Days of Code" challenge', 90],
   ];
-  for (const [who, emoji, text, minsAgo] of posts) {
+  for (const [who, type, text, minsAgo] of posts) {
     await signInWithEmailAndPassword(auth, `${who}@ritual.dev`, DEMO_PASSWORD);
     const p = PEOPLE.find((x) => x.username === who)!;
     await addDoc(collection(db, 'activity'), {
@@ -492,8 +492,7 @@ async function main() {
       username: who,
       displayName: p.displayName,
       avatar: p.avatar,
-      type: 'milestone',
-      emoji,
+      type,
       text,
       kudos: [],
       createdAt: Timestamp.fromMillis(Date.now() - minsAgo * 60_000),
@@ -507,8 +506,8 @@ async function main() {
   const challengeRef = await addDoc(collection(db, 'challenges'), {
     title: '30 Days of Code',
     description: 'Ship something every day for a month. Commits, PRs, LeetCode — it all counts.',
-    emoji: '👨‍💻',
-    color: '#14B8A6',
+    icon: 'git-commit',
+    color: 'lime',
     kind: 'check',
     target: 1,
     unit: null,

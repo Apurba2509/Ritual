@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
 import { memo, useEffect } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  FadeInDown,
-  interpolateColor,
+  FadeIn,
+  FadeOut,
+  interpolate,
   LinearTransition,
   useAnimatedStyle,
   useSharedValue,
@@ -12,17 +14,18 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
+import { scheduleOnRN } from 'react-native-worklets';
 import type { DayKey } from '@/domain/dates';
-import { isEntryDone, progressOf, scheduleLabel } from '@/domain/habits';
+import { progressOf, scheduleLabel } from '@/domain/habits';
 import type { Entry, Habit } from '@/domain/types';
-import { Icon } from '@/ui/Icon';
+import { haptic } from '@/lib/haptics';
+import { Icon, isIconName } from '@/ui/Icon';
 import { ProgressRing } from '@/ui/ProgressRing';
 import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
-import { alpha, radius, useTheme } from '@/ui/theme';
-import { addProgress, toggleHabit } from './actions';
-import { autoLabel, formatProgress, stepFor } from './format';
-import { HabitIcon } from './HabitIcon';
+import { tint, useTheme } from '@/ui/theme';
+import { addProgress, completeHabit, setProgress, toggleHabit } from './actions';
+import { autoIcon, formatAmount, formatProgress, stepFor } from './format';
 
 interface Props {
   habit: Habit;
@@ -33,98 +36,121 @@ interface Props {
   weekProgress?: { done: number; target: number };
   index: number;
   onLongPress: (habit: Habit) => void;
+  last?: boolean;
 }
 
-function CheckControl({ done, color, onPress }: { done: boolean; color: string; onPress: () => void }) {
+const SIZE = 36;
+const SWIPE_DONE = 84;
+
+/** Swipe right to complete (or to undo a done habit). Vertical scrolling still wins. */
+function useSwipe(onCommit: () => void) {
+  const x = useSharedValue(0);
+  const armed = useSharedValue(0);
+  const pan = Gesture.Pan()
+    .activeOffsetX(14)
+    .failOffsetY([-10, 10])
+    .onUpdate((e) => {
+      x.value = Math.max(0, Math.min(140, e.translationX));
+      const next = x.value > SWIPE_DONE ? 1 : 0;
+      if (next !== armed.value) {
+        armed.value = next;
+        if (next) scheduleOnRN(haptic.light);
+      }
+    })
+    .onEnd(() => {
+      if (x.value > SWIPE_DONE) scheduleOnRN(onCommit);
+      x.value = withSpring(0, { damping: 18, stiffness: 220 });
+      armed.value = 0;
+    });
+  const row = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  const reveal = useAnimatedStyle(() => ({ opacity: interpolate(x.value, [0, 24], [0, 1], 'clamp') }));
+  const mark = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(x.value, [20, SWIPE_DONE], [0.5, 1.1], 'clamp') }],
+  }));
+  return { pan, row, reveal, mark };
+}
+
+function Glyph({ habit, size = 42 }: { habit: Habit; size?: number }) {
+  const t = useTheme();
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: t.surface2,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Icon
+        name={isIconName(habit.icon) ? habit.icon : 'sparkle'}
+        size={Math.round(size * 0.5)}
+        color={tint(habit.color, t)}
+        weight="fill"
+      />
+    </View>
+  );
+}
+
+/** Right-hand control: an empty check, or a progress ring with + / ▶ for amounts. */
+function Control({
+  habit,
+  entry,
+  day,
+  onLongPress,
+}: {
+  habit: Habit;
+  entry: Entry | undefined;
+  day: DayKey;
+  onLongPress: () => void;
+}) {
   const t = useTheme();
   const scale = useSharedValue(1);
-  const fill = useSharedValue(done ? 1 : 0);
-  useEffect(() => {
-    fill.value = withTiming(done ? 1 : 0, { duration: 220 });
-  }, [done, fill]);
-  const clear = alpha(color, 0);
-  const style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    backgroundColor: interpolateColor(fill.value, [0, 1], [clear, color]),
-  }));
-  const iconStyle = useAnimatedStyle(() => ({ opacity: fill.value, transform: [{ scale: 0.6 + fill.value * 0.4 }] }));
+  const pop = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const isCheck = habit.kind === 'check';
+  const press = () => {
+    scale.value = withSequence(withTiming(0.82, { duration: 70 }), withSpring(1, { damping: 8, stiffness: 320 }));
+    if (isCheck) toggleHabit(habit.id, day);
+    else if (habit.kind === 'count') addProgress(habit.id, day, stepFor(habit));
+    else router.push(`/focus/${habit.id}`);
+  };
   return (
     <Tap
-      onPress={() => {
-        scale.value = withSequence(withTiming(0.82, { duration: 70 }), withSpring(1, { damping: 8, stiffness: 300 }));
-        onPress();
-      }}
+      onPress={press}
+      onLongPress={isCheck ? undefined : onLongPress}
       haptics={false}
       scaleTo={1}
-      hitSlop={10}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: done }}
-      accessibilityLabel={done ? 'Mark as not done' : 'Mark as done'}
+      hitSlop={12}
+      accessibilityRole={isCheck ? 'checkbox' : 'button'}
+      accessibilityState={isCheck ? { checked: false } : undefined}
+      accessibilityLabel={
+        isCheck
+          ? `Mark ${habit.name} as done`
+          : habit.kind === 'count'
+            ? `Add ${formatAmount(habit, stepFor(habit))} to ${habit.name}`
+            : `Start a focus timer for ${habit.name}`
+      }
     >
-      <Animated.View
-        style={[
-          {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            borderWidth: 2.5,
-            borderColor: done ? color : alpha(t.text, 0.18),
-            alignItems: 'center',
-            justifyContent: 'center',
-          },
-          style,
-        ]}
-      >
-        <Animated.View style={iconStyle}>
-          <Icon name="check" size={22} color="#FFFFFF" />
-        </Animated.View>
+      <Animated.View style={[{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }, pop]}>
+        {isCheck ? (
+          <View
+            style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: 2, borderColor: t.borderStrong }}
+          />
+        ) : (
+          <>
+            <View style={{ position: 'absolute' }}>
+              <ProgressRing progress={progressOf(habit, entry)} size={SIZE} stroke={3} duration={450} />
+            </View>
+            <Icon name={habit.kind === 'count' ? 'plus' : 'play'} size={14} color={t.text} weight="bold" />
+          </>
+        )}
       </Animated.View>
     </Tap>
   );
 }
 
-function RingControl({
-  progress,
-  color,
-  icon,
-  done,
-  onPress,
-  onLongPress,
-  label,
-}: {
-  progress: number;
-  color: string;
-  icon: 'plus' | 'play';
-  done: boolean;
-  onPress: () => void;
-  onLongPress: () => void;
-  label: string;
-}) {
-  return (
-    <Tap
-      onPress={onPress}
-      onLongPress={onLongPress}
-      haptics={false}
-      scaleTo={0.88}
-      hitSlop={10}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <ProgressRing progress={progress} size={46} stroke={4.5} color={color} duration={450}>
-        <View style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-          {/* Filled disc drawn in SVG so it is perfectly round on every platform. */}
-          {done ? (
-            <Svg width={32} height={32} style={{ position: 'absolute' }}>
-              <Circle cx={16} cy={16} r={16} fill={color} />
-            </Svg>
-          ) : null}
-          <Icon name={done ? 'check' : icon} size={done ? 18 : 16} color={done ? '#FFFFFF' : color} />
-        </View>
-      </ProgressRing>
-    </Tap>
-  );
-}
-
+/** A habit that still needs doing today. */
 export const HabitRow = memo(function HabitRow({
   habit,
   entry,
@@ -134,111 +160,178 @@ export const HabitRow = memo(function HabitRow({
   weekProgress,
   index,
   onLongPress,
+  last,
 }: Props) {
   const t = useTheme();
-  const done = isEntryDone(habit, entry);
   const skipped = !!entry?.skipped && !entry.deleted;
   const value = entry && !entry.deleted ? entry.value : 0;
-  const auto = autoLabel(habit.auto);
+  const auto = autoIcon(habit.auto);
+  const swipe = useSwipe(() => {
+    haptic.success();
+    completeHabit(habit.id, day, 'manual');
+  });
 
   const meta: string[] = [];
-  if (habit.kind !== 'check') meta.push(formatProgress(habit, value));
-  if (weekProgress) meta.push(`${weekProgress.done}/${weekProgress.target} this week`);
-  else meta.push(scheduleLabel(habit.schedule));
-
-  const control =
-    habit.kind === 'check' ? (
-      <CheckControl done={done} color={habit.color} onPress={() => toggleHabit(habit.id, day)} />
-    ) : habit.kind === 'count' ? (
-      <RingControl
-        progress={progressOf(habit, entry)}
-        color={habit.color}
-        icon="plus"
-        done={done}
-        label={`Add ${stepFor(habit)} ${habit.unit ?? ''}`}
-        onPress={() => addProgress(habit.id, day, stepFor(habit))}
-        onLongPress={() => onLongPress(habit)}
-      />
-    ) : (
-      <RingControl
-        progress={progressOf(habit, entry)}
-        color={habit.color}
-        icon="play"
-        done={done}
-        label="Start focus timer"
-        onPress={() => (done ? onLongPress(habit) : router.push(`/focus/${habit.id}`))}
-        onLongPress={() => onLongPress(habit)}
-      />
-    );
+  if (skipped) meta.push('Rest day · streak protected');
+  else {
+    if (habit.kind !== 'check') meta.push(formatProgress(habit, value));
+    if (weekProgress) meta.push(`${weekProgress.done} of ${weekProgress.target} this week`);
+    else if (habit.kind === 'check') meta.push(scheduleLabel(habit.schedule));
+  }
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(Math.min(index, 8) * 45)
-        .springify()
-        .damping(18)}
-      layout={LinearTransition.springify().damping(20)}
+      entering={FadeIn.delay(Math.min(index, 8) * 35).duration(260)}
+      exiting={FadeOut.duration(160)}
+      layout={LinearTransition.springify().damping(22)}
     >
-      <Tap
-        onPress={() => router.push(`/habit/${habit.id}`)}
-        onLongPress={() => onLongPress(habit)}
-        delayLongPress={350}
-        scaleTo={0.985}
-        haptics={false}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 14,
-          padding: 12,
-          paddingRight: 14,
-          borderRadius: radius.lg,
-          backgroundColor: done ? alpha(habit.color, t.scheme === 'dark' ? 0.08 : 0.06) : t.surface,
-          borderWidth: 1,
-          borderColor: done ? alpha(habit.color, 0.28) : t.border,
-        }}
-      >
-        <HabitIcon emoji={habit.emoji} color={habit.color} filled={done} />
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text variant="subheading" numberOfLines={1} tone={skipped ? 'faint' : 'default'}>
-            {habit.name}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {streak > 0 ? (
-              <Text variant="caption" color={t.accent} style={{ fontFamily: 'Inter_600SemiBold' }}>
-                🔥 {streak}
-                {streakUnit === 'week' ? 'w' : ''}
-              </Text>
-            ) : null}
-            <Text variant="caption" tone="muted" numberOfLines={1}>
-              {skipped ? 'Rest day · streak protected' : meta.join(' · ')}
-            </Text>
-            {auto ? (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 3,
-                  paddingHorizontal: 6,
-                  height: 18,
-                  borderRadius: 9,
-                  backgroundColor: t.xpSoft,
-                }}
-              >
-                <Icon name="zap" size={10} color={t.xp} />
-                <Text variant="caption" size={10} color={t.xp} style={{ fontFamily: 'Inter_600SemiBold' }}>
-                  {auto}
+      <GestureDetector gesture={swipe.pan}>
+        <View style={{ overflow: 'hidden' }}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: t.accent, justifyContent: 'center', paddingLeft: 26 },
+              swipe.reveal,
+            ]}
+          >
+            <Animated.View style={swipe.mark}>
+              <Icon name="check" size={24} color={t.onAccent} weight="bold" />
+            </Animated.View>
+          </Animated.View>
+          <Animated.View style={[{ backgroundColor: t.bg }, swipe.row]}>
+            <Tap
+              onPress={() => router.push(`/habit/${habit.id}`)}
+              onLongPress={() => onLongPress(habit)}
+              delayLongPress={350}
+              scaleTo={0.99}
+              haptics={false}
+              accessibilityHint="Opens details. Swipe right to complete, long-press to log details."
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 13 }}
+            >
+              <Glyph habit={habit} />
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text variant="subheading" numberOfLines={1} tone={skipped ? 'muted' : 'default'}>
+                  {habit.name}
                 </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {streak > 0 && !skipped ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                      <Icon name="fire" size={12} color={t.text} weight="fill" />
+                      <Text variant="caption" weight="bold" tabular>
+                        {streak}
+                        {streakUnit === 'week' ? 'w' : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {auto ? <Icon name={auto} size={12} color={t.textMuted} weight="fill" /> : null}
+                  <Text variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+                    {meta.join(' · ')}
+                  </Text>
+                </View>
               </View>
-            ) : null}
-          </View>
+              {skipped ? (
+                <View style={{ width: SIZE, alignItems: 'center' }}>
+                  <Icon name="moon" size={18} color={t.textFaint} />
+                </View>
+              ) : (
+                <Control habit={habit} entry={entry} day={day} onLongPress={() => onLongPress(habit)} />
+              )}
+            </Tap>
+          </Animated.View>
+          {last ? null : (
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: t.borderStrong, marginLeft: 56 }} />
+          )}
         </View>
-        {skipped ? (
-          <View style={{ width: 44, alignItems: 'center' }}>
-            <Icon name="moon" size={20} color={t.textFaint} />
-          </View>
-        ) : (
-          control
-        )}
-      </Tap>
+      </GestureDetector>
+    </Animated.View>
+  );
+});
+
+/** A finished habit, folded into the compact "Done" group. Tap the check (or swipe) to undo. */
+export const DoneRow = memo(function DoneRow({
+  habit,
+  entry,
+  day,
+  onLongPress,
+}: {
+  habit: Habit;
+  entry: Entry | undefined;
+  day: DayKey;
+  onLongPress: (habit: Habit) => void;
+}) {
+  const t = useTheme();
+  const undo = () => (habit.kind === 'check' ? toggleHabit(habit.id, day) : setProgress(habit.id, day, 0));
+  const swipe = useSwipe(undo);
+  const scale = useSharedValue(0.6);
+  useEffect(() => {
+    scale.value = withSpring(1, { damping: 7, stiffness: 300 });
+  }, [scale]);
+  const pop = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const value = entry && !entry.deleted ? entry.value : 0;
+  const at = entry?.completedAt
+    ? new Date(entry.completedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : null;
+  const detail = habit.kind === 'check' ? at : formatAmount(habit, value);
+  const auto = !!entry && ['device', 'workout', 'github', 'leetcode', 'health'].includes(entry.source);
+  const fill = t.scheme === 'dark' ? t.accent : t.accentInk;
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(240)}
+      exiting={FadeOut.duration(140)}
+      layout={LinearTransition.springify().damping(22)}
+    >
+      <GestureDetector gesture={swipe.pan}>
+        <View style={{ overflow: 'hidden' }}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: t.surface3, justifyContent: 'center', paddingLeft: 22 },
+              swipe.reveal,
+            ]}
+          >
+            <Animated.View style={swipe.mark}>
+              <Icon name="arrow-counter-clockwise" size={20} color={t.text} />
+            </Animated.View>
+          </Animated.View>
+          <Animated.View style={[{ backgroundColor: t.bg }, swipe.row]}>
+            <Tap
+              onPress={() => router.push(`/habit/${habit.id}`)}
+              onLongPress={() => onLongPress(habit)}
+              delayLongPress={350}
+              scaleTo={0.99}
+              haptics={false}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 9 }}
+            >
+              <Tap
+                onPress={undo}
+                hitSlop={10}
+                haptics="light"
+                scaleTo={0.85}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: true }}
+                accessibilityLabel={`Undo ${habit.name}`}
+              >
+                <Animated.View style={[{ width: 42, height: 28, alignItems: 'center', justifyContent: 'center' }, pop]}>
+                  <Svg width={28} height={28} style={{ position: 'absolute', left: 7 }}>
+                    <Circle cx={14} cy={14} r={14} fill={fill} />
+                  </Svg>
+                  <Icon name="check" size={15} color={t.scheme === 'dark' ? t.onAccent : '#FFFFFF'} weight="bold" />
+                </Animated.View>
+              </Tap>
+              <Text variant="body" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
+                {habit.name}
+              </Text>
+              {auto ? <Icon name="lightning" size={12} color={t.textFaint} weight="fill" /> : null}
+              {detail ? (
+                <Text variant="caption" tone="faint" tabular>
+                  {detail}
+                </Text>
+              ) : null}
+            </Tap>
+          </Animated.View>
+        </View>
+      </GestureDetector>
     </Animated.View>
   );
 });

@@ -1,3 +1,4 @@
+import { habitIconKey, tintKey } from '@/domain/catalog';
 import {
   addDoc,
   arrayRemove,
@@ -37,7 +38,7 @@ export function toProfile(data: DocumentData): PublicProfile {
     uid: data.uid,
     username: data.username,
     displayName: data.displayName ?? data.username,
-    avatar: data.avatar ?? { emoji: '🔥', color: '#FF6A3D' },
+    avatar: data.avatar ?? { emoji: '', color: 'lime' },
     bio: data.bio ?? null,
     xp: data.xp ?? 0,
     level: data.level ?? 1,
@@ -168,7 +169,7 @@ export async function markInboxRead(ids: string[]) {
 // ─── Activity feed ──────────────────────────────────────────────────────────
 
 /** Fire-and-forget: share a moment with friends. No-op for guests. */
-export function postActivity(a: { type: ActivityType; emoji: string; text: string }) {
+export function postActivity(a: { type: ActivityType; text: string }) {
   const fb = firebase();
   const uid = me();
   if (!fb || !uid || !useApp.getState().profile.username) return;
@@ -189,7 +190,6 @@ export function toActivity(id: string, d: DocumentData): Activity {
     displayName: d.displayName,
     avatar: d.avatar,
     type: d.type,
-    emoji: d.emoji,
     text: d.text,
     createdAt: millis(d.createdAt),
     kudos: d.kudos ?? [],
@@ -209,7 +209,7 @@ export async function toggleKudos(activity: Activity) {
       fromName: card.displayName,
       fromAvatar: card.avatar,
       type: 'kudos',
-      text: `sent 🔥 for "${activity.text}"`,
+      text: `cheered "${activity.text}"`,
       createdAt: serverTimestamp(),
       read: false,
     }).catch(() => {});
@@ -245,8 +245,8 @@ export function toChallenge(id: string, d: DocumentData): Challenge {
     id,
     title: d.title,
     description: d.description ?? '',
-    emoji: d.emoji,
-    color: d.color,
+    icon: habitIconKey(d),
+    color: tintKey(d.color),
     kind: d.kind,
     target: d.target,
     unit: d.unit ?? null,
@@ -340,7 +340,7 @@ export async function joinChallenge(c: Challenge): Promise<string> {
     existingHabit?.id ??
     app.createHabit({
       name: c.title,
-      emoji: c.emoji,
+      icon: c.icon,
       color: c.color,
       kind: c.kind,
       target: c.target,
@@ -354,7 +354,7 @@ export async function joinChallenge(c: Challenge): Promise<string> {
       challengeId: c.id,
     });
   app.setSocialCounts({ challengesJoined: app.social.challengesJoined + 1 });
-  postActivity({ type: 'challenge_join', emoji: c.emoji, text: `joined the "${c.title}" challenge` });
+  postActivity({ type: 'challenge_join', text: `joined the "${c.title}" challenge` });
   return habitId;
 }
 

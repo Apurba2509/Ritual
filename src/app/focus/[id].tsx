@@ -16,13 +16,14 @@ import { useApp } from '@/data/store';
 import { useUI } from '@/data/ui';
 import { addProgress } from '@/features/habits/actions';
 import { formatAmount } from '@/features/habits/format';
+import { HabitIcon } from '@/features/habits/HabitIcon';
 import { cancelNotification, scheduleAt } from '@/features/notifications/scheduler';
 import { haptic } from '@/lib/haptics';
 import { Button, IconButton } from '@/ui/Button';
 import { Chip } from '@/ui/Chip';
 import { ProgressRing } from '@/ui/ProgressRing';
 import { Text } from '@/ui/Text';
-import { alpha, useTheme, shadow } from '@/ui/theme';
+import { shadow, useTheme } from '@/ui/theme';
 
 type Phase = 'setup' | 'running' | 'paused' | 'done';
 const NOTIF_ID = 'focus:end';
@@ -109,7 +110,7 @@ export default function FocusScreen() {
     scheduleAt(
       NOTIF_ID,
       new Date(at + totalMs - bankedMs),
-      `${habit.emoji} Session complete`,
+      'Session complete',
       `${minutes} minutes of ${habit.name}. Nice work — it's logged.`,
     );
   };
@@ -157,21 +158,15 @@ export default function FocusScreen() {
           <View
             style={{
               borderRadius: 999,
-              ...shadow(habit.color, phase === 'running' ? 0.55 : 0.2, 50),
+              ...shadow(t.scheme === 'dark' ? t.accent : t.shadow, phase === 'running' ? 0.28 : 0.08, 60),
             }}
           >
-            <ProgressRing
-              progress={progress}
-              size={280}
-              stroke={14}
-              color={habit.color}
-              colorEnd={t.accent}
-              track={alpha(habit.color, 0.12)}
-              duration={300}
-            >
-              <Text size={46}>{habit.emoji}</Text>
-              <Text variant="hero" size={58} style={{ fontVariant: ['tabular-nums'] }}>
-                {phase === 'done' ? '✓' : fmt((phase === 'setup' ? totalMs : remaining) / 1000)}
+            <ProgressRing progress={progress} size={290} stroke={10} duration={300}>
+              <View style={{ marginBottom: 6 }}>
+                <HabitIcon icon={habit.icon} color={habit.color} size={44} />
+              </View>
+              <Text weight="heavy" size={64} tabular style={{ letterSpacing: -3, lineHeight: 70 }}>
+                {phase === 'done' ? 'Done' : fmt((phase === 'setup' ? totalMs : remaining) / 1000)}
               </Text>
               <Text variant="caption" tone="muted">
                 {phase === 'setup'
@@ -194,13 +189,7 @@ export default function FocusScreen() {
             {[...new Set([5, 10, 15, 25, 45, 60, remainingTarget])]
               .sort((a, b) => a - b)
               .map((m) => (
-                <Chip
-                  key={m}
-                  label={`${m} min`}
-                  selected={minutes === m}
-                  color={habit.color}
-                  onPress={() => setMinutes(m)}
-                />
+                <Chip key={m} label={`${m} min`} selected={minutes === m} onPress={() => setMinutes(m)} />
               ))}
           </Animated.View>
         ) : null}

@@ -13,23 +13,22 @@ import {
   collection,
   deleteDoc,
   doc,
-  getDoc,
+  DocumentReference,
   getDocs,
+  increment,
+  query,
   runTransaction,
-  serverTimestamp,
+  where,
   writeBatch,
 } from 'firebase/firestore';
-import { requireFirebase } from '@/lib/firebase';
+import { firebase, requireFirebase } from '@/lib/firebase';
+import { reauthenticateWithGoogle, signInWithGoogle, signOutGoogle } from '@/lib/googleAuth';
 import { cancelAllReminders } from '@/features/notifications/scheduler';
-import { useSession } from './session';
+import { setPendingDisplayName } from './identity';
 import { useApp } from './store';
 import { sync } from './sync';
 
-export const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
-
-export function normalizeUsername(raw: string) {
-  return raw.trim().toLowerCase().replace(/^@/, '');
-}
+export { claimUsername, isUsernameAvailable, normalizeUsername, USERNAME_RE } from './identity';
 
 /** Human-friendly messages for Firebase Auth error codes. */
 export function authErrorMessage(err: unknown): string {
@@ -50,47 +49,34 @@ export function authErrorMessage(err: unknown): string {
     case 'auth/network-request-failed':
       return "You're offline. Connect to the internet and try again.";
     case 'auth/requires-recent-login':
-      return 'For security, please enter your password again.';
+      return 'For security, please sign in again first.';
+    case 'auth/account-exists-with-different-credential':
+      return 'This email already uses a password. Sign in with email, then link Google from Account.';
+    case 'auth/operation-not-allowed':
+      return 'This sign-in method is not enabled for the project yet.';
+    case 'auth/unauthorized-domain':
+      return "This website isn't allowed to use Google sign-in yet.";
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the Google window. Allow popups and try again.';
     default:
       return (err as Error)?.message?.replace(/^Firebase: /, '') || 'Something went wrong.';
   }
 }
 
-export async function isUsernameAvailable(username: string): Promise<boolean> {
-  const { db } = requireFirebase();
-  const snap = await getDoc(doc(db, 'usernames', username));
-  return !snap.exists() || snap.data()?.uid === useSession.getState().user?.uid;
-}
-
-/** Atomically reserve a username for the signed-in user (releasing their old one). */
-export async function claimUsername(username: string) {
-  const { db, auth } = requireFirebase();
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('Not signed in');
-  if (!USERNAME_RE.test(username)) throw new Error('Usernames are 3–20 characters: letters, numbers, _ or .');
-  const previous = useApp.getState().profile.username;
-  await runTransaction(db, async (tx) => {
-    const ref = doc(db, 'usernames', username);
-    const snap = await tx.get(ref);
-    if (snap.exists() && snap.data().uid !== uid) throw new Error('That username is taken.');
-    tx.set(ref, { uid, createdAt: serverTimestamp() });
-    if (previous && previous !== username) tx.delete(doc(db, 'usernames', previous));
-  });
-  useApp.getState().updateProfile({ username });
-  sync.schedulePublish();
-}
-
-export async function signUp(params: { email: string; password: string; displayName: string; username: string }) {
+export async function signUp(params: { email: string; password: string; displayName: string }) {
   const { auth } = requireFirebase();
-  const username = normalizeUsername(params.username);
-  if (!USERNAME_RE.test(username)) throw new Error('Usernames are 3–20 characters: letters, numbers, _ or .');
-  if (!(await isUsernameAvailable(username))) throw new Error('That username is taken.');
-
+  const name = params.displayName.trim();
+  setPendingDisplayName(name);
   const cred = await createUserWithEmailAndPassword(auth, params.email.trim(), params.password);
-  await fbUpdateProfile(cred.user, { displayName: params.displayName.trim() });
-  useApp.getState().updateProfile({ displayName: params.displayName.trim() });
-  await claimUsername(username);
+  await fbUpdateProfile(cred.user, { displayName: name });
+  useApp.getState().updateProfile({ displayName: name });
   sendEmailVerification(cred.user).catch(() => {});
+}
+
+/** One tap: Google account → Firebase session. Resolves false if the person cancelled. */
+export async function continueWithGoogle(): Promise<boolean> {
+  const cred = await signInWithGoogle();
+  return !!cred;
 }
 
 export async function signIn(email: string, password: string) {
@@ -110,25 +96,58 @@ export async function signOut() {
   sync.stop();
   await cancelAllReminders();
   useApp.getState().resetForUser(null);
+  await signOutGoogle();
   await fbSignOut(auth);
 }
 
+/** How the signed-in account authenticates — decides how we ask for re-authentication. */
+export function signInMethod(): 'google' | 'password' | null {
+  const user = firebase()?.auth.currentUser;
+  if (!user) return null;
+  return user.providerData.some((p) => p.providerId === 'password') ? 'password' : 'google';
+}
+
 /** Permanently delete the account and all cloud data (Play Store & GDPR requirement). */
-export async function deleteAccount(password: string) {
+export async function deleteAccount(password?: string) {
   const { auth, db } = requireFirebase();
   const user = auth.currentUser;
-  if (!user?.email) throw new Error('Not signed in');
-  await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+  if (!user) throw new Error('Not signed in');
+  if (signInMethod() === 'password') {
+    if (!user.email || !password) throw new Error('Enter your password to confirm.');
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+  } else {
+    await reauthenticateWithGoogle(user);
+  }
   const uid = user.uid;
   sync.stop();
 
-  for (const sub of ['habits', 'entries', 'inbox']) {
-    const snap = await getDocs(collection(db, 'users', uid, sub));
-    for (let i = 0; i < snap.docs.length; i += 400) {
+  const deleteAll = async (refs: { ref: DocumentReference }[]) => {
+    for (let i = 0; i < refs.length; i += 400) {
       const batch = writeBatch(db);
-      snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+      refs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
       await batch.commit();
     }
+  };
+  for (const sub of ['habits', 'entries', 'workouts', 'inbox']) {
+    await deleteAll((await getDocs(collection(db, 'users', uid, sub))).docs);
+  }
+  // Public traces: feed posts, friendships and challenge memberships.
+  await deleteAll((await getDocs(query(collection(db, 'activity'), where('uid', '==', uid)))).docs).catch(() => {});
+  await deleteAll(
+    (await getDocs(query(collection(db, 'friendships'), where('uids', 'array-contains', uid)))).docs,
+  ).catch(() => {});
+  const challengeIds = new Set(
+    Object.values(useApp.getState().habits)
+      .map((h) => h.challengeId)
+      .filter((c): c is string => !!c),
+  );
+  for (const cid of challengeIds) {
+    await runTransaction(db, async (tx) => {
+      const member = doc(db, 'challenges', cid, 'members', uid);
+      if (!(await tx.get(member)).exists()) return;
+      tx.delete(member);
+      tx.update(doc(db, 'challenges', cid), { memberCount: increment(-1) });
+    }).catch(() => {});
   }
   const username = useApp.getState().profile.username;
   if (username) await deleteDoc(doc(db, 'usernames', username)).catch(() => {});
@@ -136,5 +155,6 @@ export async function deleteAccount(password: string) {
   await deleteDoc(doc(db, 'users', uid));
   await cancelAllReminders();
   useApp.getState().resetForUser(null);
+  await signOutGoogle();
   await deleteUser(user);
 }

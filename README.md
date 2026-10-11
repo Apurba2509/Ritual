@@ -1,216 +1,197 @@
 <p align="center">
-  <img src="assets/images/logo.png" width="96" alt="Ritual logo" />
+  <img src="assets/brand/logo-dark.png" width="420" alt="ritual." />
 </p>
 
-<h1 align="center">Ritual</h1>
-<p align="center"><b>The habit tracker that tracks itself.</b></p>
+<p align="center"><b>Habits that track themselves.</b></p>
 
 <p align="center">
-  Auto-tracking from GitHub, LeetCode &amp; Health Connect · log by just saying what you did · streaks, XP &amp; friends.<br/>
-  React Native (Expo SDK 57) · TypeScript · Firebase · Gemini
+  Your phone counts the steps, notices the run, sees the commit, hears what you did, and checks the habit off.<br/>
+  Offline, in the background, without you opening the app.
 </p>
 
 <p align="center">
-  <a href="https://ritual-37ccf.web.app"><b>🌐 Live demo → ritual-37ccf.web.app</b></a>
+  <a href="https://ritual-37ccf.web.app"><b>Live demo → ritual-37ccf.web.app</b></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/Apurba2509/Ritual/actions/workflows/ci.yml"><img src="https://github.com/Apurba2509/Ritual/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <img src="https://img.shields.io/badge/Expo-SDK%2057-000?logo=expo" alt="Expo SDK 57" />
-  <img src="https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black" alt="React Native 0.86" />
+  <img src="https://img.shields.io/badge/React%20Native-0.86%20·%20New%20Arch-61DAFB?logo=react&logoColor=black" alt="React Native 0.86" />
+  <img src="https://img.shields.io/badge/Kotlin-native%20module-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin native module" />
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="TypeScript strict" />
-  <img src="https://img.shields.io/badge/Firebase-Auth%20%C2%B7%20Firestore%20%C2%B7%20AI%20Logic-FFCA28?logo=firebase&logoColor=black" alt="Firebase" />
+  <img src="https://img.shields.io/badge/Firebase-Auth%20·%20Firestore%20·%20AI%20Logic-FFCA28?logo=firebase&logoColor=black" alt="Firebase" />
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/today.png" width="200" alt="Today" />
-  <img src="docs/screenshots/quick-log.png" width="200" alt="AI quick log" />
+  <img src="docs/screenshots/today.png" width="200" alt="Today: the day ring" />
+  <img src="docs/screenshots/workout.png" width="200" alt="Workout recorder" />
+  <img src="docs/screenshots/habit.png" width="200" alt="Habit detail" />
   <img src="docs/screenshots/insights.png" width="200" alt="Insights" />
-  <img src="docs/screenshots/social.png" width="200" alt="Social feed" />
 </p>
 <p align="center">
   <img src="docs/screenshots/welcome.png" width="200" alt="Welcome" />
-  <img src="docs/screenshots/habit.png" width="200" alt="Habit detail" />
+  <img src="docs/screenshots/tracking.png" width="200" alt="What Ritual is tracking" />
+  <img src="docs/screenshots/quick-log.png" width="200" alt="Log by voice or text" />
   <img src="docs/screenshots/profile.png" width="200" alt="Profile" />
 </p>
 
 ---
 
-## Why Ritual?
+## Why it's different
 
-Most habit trackers die the same death: you stop opening the app to tick boxes. Ritual removes the manual work.
+Every habit tracker has streaks. They all die the same way: you stop opening the app to tick boxes.
+Ritual is built around one idea: **the best check-in is the one you never have to make.**
 
-| Problem | Ritual's answer |
+| Most habit apps | Ritual |
 | --- | --- |
-| "I forgot to log it" | **Auto-tracking** — coding habits complete from your GitHub contributions or LeetCode submissions; steps, workouts and sleep come from Health Connect (Google Fit, Samsung Health, Fitbit, Strava…). History is back-filled, so streaks start where you already are. |
-| "Logging is tedious" | **Say it, done** — "ran 5k, read 20 pages and meditated 15 min" becomes three check-ins (Gemini via Firebase AI Logic, with an offline on-device parser as fallback). |
-| "Reminders are noise" | **Smart reminders** — only for habits not yet done, with a **✓ Done** button right in the notification; an evening nudge only when a streak is actually at risk. |
-| "I lose motivation" | **Gamification that's honest** — XP and levels derived from your real history, streak milestones, 21 achievements, perfect-day runs, confetti. |
-| "Doing it alone is hard" | **Social** — friends by username, a feed with 🔥 kudos, nudges, weekly leaderboards, group challenges. |
-| "I don't know what to change" | **Insights + AI coach** — year heatmap, weekday patterns, mood correlations, an AI weekly review, and a coach that turns a goal into a habit plan. |
+| You tap "done" | Your **phone's own sensors** do it: a hardware step counter read by a background worker, Android activity recognition for walks / runs / rides, and a GPS + barometer workout recorder. It works **with the app closed, with no internet, and even with no GPS** (distance falls back to steps × stride). |
+| Steps need a second fitness app | Steps are counted **on the device by Ritual itself**; Health Connect is optional. |
+| Coding habits are honour-system | **GitHub** contributions and **LeetCode** submissions complete coding habits, with a year of history back-filled. |
+| Logging is typing into forms | **Say it**: "ran 5k and read 20 pages" → two check-ins (speech recognition → Gemini, with an on-device parser as fallback). |
+| Reminders nag about things you already did | A **notification planner** rebuilds the schedule whenever data changes. Walk and the step reminder disappears; a "last call" only fires when a real streak is about to break. |
+| You have to open the app | A **home-screen widget** shows the day ring and completes habits with one tap; on **Android 16** a live workout becomes a status-bar **Live Update**. |
 
 ## Feature tour
 
-- **Today** — week strip with per-day rings, daily progress, one-tap check / +1 / focus timer per habit, long-press for notes, mood, photo proof or a rest day (protects your streak).
-- **Habits** — yes/no, count (glasses, pages, steps) or duration; daily, specific weekdays or *N× per week*; reminders; difficulty; intention ("why this matters").
-- **Auto-tracking** — GitHub (contribution calendar), LeetCode (submission calendar), Health Connect (steps / exercise / sleep). Runs on launch, on resume and on pull-to-refresh.
-- **Quick log** — natural-language logging with a review step before anything is saved.
-- **Focus timer** — timestamp-based (survives backgrounding), keeps the screen awake, notifies when done, logs minutes automatically.
-- **Insights** — consistency vs. previous period, activity bars, GitHub-style year heatmap, weekday strengths, per-habit consistency, mood links, AI weekly review.
-- **Gamification** — XP = f(difficulty, streak) with milestone bonuses; triangular level curve with ranks (Spark → Eternal); 21 achievements across 4 tiers; shareable celebration cards.
-- **Social** — friend requests, live activity feed with kudos, nudges, friends & global weekly leaderboards, public/invite-only challenges with live member leaderboards.
-- **Accounts** — email/password, guest mode with one-tap upgrade (guest history migrates to the cloud), password reset, data export, account deletion.
-- **Polish** — dark & light themes, haptics, spring animations, confetti, Android notification actions, offline-first everything.
+- **Today**: the *day ring*, one segment per habit that lights up as you go; a week strip; swipe a habit right to complete it; finished habits fold into a compact "Done" list; a live "Tracking" indicator that always tells you what the phone is sensing.
+- **Phone sensing (Android, Kotlin)**:
+  - **Step counter**: snapshotted every ~15 minutes by WorkManager, survives reboots, and splits steps across midnight.
+  - **Activity recognition**: notices walks, runs and rides on its own. "Noticed today" shows exactly what it saw.
+  - **Workout recorder**: a foreground service with route, pace, km splits, barometric elevation and steps. It has a live notification with Pause/Finish, becomes a Live Update on Android 16, survives the process being killed, and works offline.
+- **Auto-tracking**: phone sensors, GitHub, LeetCode and Health Connect, with history back-filled so streaks start where you already are.
+- **Log by voice or text**: speech-to-text with live partial results, interpreted by Gemini into check-ins you confirm.
+- **Notifications that coach**: three intensities (Calm / Balanced / Coach), smart nudges for habits without a time, an afternoon walk push when steps are behind, quiet hours, Done / Snooze buttons right in the notification, and alerts when a habit completes itself in the background.
+- **Insights**: consistency with a trend line, year heatmap, weekday strengths, mood links and an AI weekly review.
+- **Gamification**: XP and levels derived from history, 21 achievements with tiered medals, and brand-dark share cards for milestones.
+- **Social**: friends by username, a live feed with kudos, nudges, weekly leaderboards and group challenges.
+- **Accounts**: one-tap **Google sign-in** (photo and name come from Google), email/password, a guest mode with sample data, account deletion that erases everything.
+- **Adaptive**: phones, tall phones, foldables, tablets and landscape. On desktop web the app runs inside a phone frame next to a short pitch.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph Device
-    UI[Screens<br/>expo-router] --> Hooks[Selectors &amp; hooks]
-    Hooks --> Domain[Pure domain layer<br/>streaks · XP · achievements · insights]
-    UI --> Actions[Actions<br/>haptics · celebrations · reminders]
-    Actions --> Store[(Zustand store<br/>persisted to MMKV)]
-    Store --> Outbox[[Outbox]]
-    Integrations[Auto-tracking engine<br/>GitHub · LeetCode · Health Connect] --> Actions
-    Notif[Local notifications<br/>✓ Done / Snooze] --> Actions
+  subgraph Android["Android (Kotlin module: modules/ritual-sensing)"]
+    SC[Step counter<br/>WorkManager snapshots] --> Ledger[(Step ledger)]
+    AR[Activity Recognition<br/>transition receiver] --> Events[(Activity log)]
+    WS[WorkoutService<br/>GPS · barometer · steps] --> Done[(Finished workouts)]
+    Boot[Boot / shutdown receiver] --> SC
   end
+  subgraph JS["App (TypeScript)"]
+    Domain[Pure domain<br/>streaks · XP · activity · notification planner]
+    Engine[Auto-tracking engine] --> Domain
+    Store[(Zustand + MMKV<br/>local-first)] --> Outbox[[Outbox]]
+    BG[Background task<br/>every ~15 min] --> Engine
+    Widget[Home-screen widget<br/>headless task]
+  end
+  Ledger --> Engine
+  Events --> Engine
+  Done --> Engine
+  Engine --> Store
+  Widget --> Store
   Outbox -- batched writes --> FS[(Firestore)]
-  FS -- realtime listeners<br/>last-write-wins --> Store
-  UI -- quick log · coach · review --> AI[Gemini<br/>Firebase AI Logic]
-  UI -- photos --> CDN[Cloudinary]
-  FS --- Social[profiles · friendships · activity · challenges]
+  FS -- realtime, last-write-wins --> Store
+  JS -- voice / text → JSON --> AI[Gemini via Firebase AI Logic]
 ```
 
-**Key engineering decisions**
+**Engineering decisions worth reading**
 
-- **Local-first.** Every interaction writes to MMKV synchronously — the UI never waits on the network and works fully offline (and fully without an account). An **outbox** records changed documents; the sync engine drains it to Firestore in batches with exponential back-off, and realtime listeners stream other devices' changes back. Conflicts resolve **last-write-wins** on a monotonic client clock; writes are idempotent (`entryId = habitId_yyyy-MM-dd`), so a crash mid-sync just resends the same batch.
-- **Derived, not stored, gamification.** Streaks, XP, levels and achievements are pure functions of habit history (`src/domain`). Two devices can never disagree about your level, back-filled integration data instantly earns the right XP, and the logic is unit-tested.
-- **Calendar days, not timestamps.** Entries are keyed by local `yyyy-MM-dd`, which makes DST, timezones and "did I do it today?" trivial and deterministic.
-- **Secure by default.** Firestore security rules validate every collection (`firestore.rules`): private data is owner-only, usernames are claimed transactionally, friendship transitions are enforced, other users can only toggle *their own* kudos, challenge counters move by ±1. The Gemini key never ships in the app (Firebase AI Logic proxies it); Cloudinary uses an unsigned, restricted preset.
-- **Smart notifications.** Reminders are scheduled as one-off notifications for the next few days and rebuilt whenever data changes — so a reminder for a habit you already finished simply doesn't exist.
+- **Collect natively, interpret in TypeScript.** The Kotlin module only records raw signals (counter readings, activity transitions, GPS fixes). All interpretation (per-day minutes, distance, deduplicating a detected run against a recorded one, splitting across midnight) lives in `src/domain/activity.ts` as pure, unit-tested functions.
+- **The step counter is cumulative since boot**, so nothing is lost while the app sleeps; the worker only has to read it. A lower reading means a reboot, and a shutdown receiver saves the last value.
+- **Honest distance.** GPS fixes are filtered for accuracy, jitter and impossible speeds; if GPS never becomes reliable (indoors, treadmill), distance comes from steps × a cadence-based stride, and the UI says so.
+- **Local-first sync.** Every change lands in MMKV instantly; an outbox drains to Firestore in batches with back-off, and realtime listeners stream other devices' changes back. Conflicts resolve last-write-wins on a monotonic clock, and deletes are tombstones.
+- **Derived gamification.** Streaks, XP, levels and achievements are pure functions of history, so devices can't disagree and back-filled data earns the right XP.
+- **Planned notifications.** `planNotifications()` is a pure function from habits, history and settings to the exact schedule for the next week, deduplicated, quiet-hours aware and tested.
+- **Secure by default.** Firestore rules validate every collection (owner-only private data, transactional usernames, enforced friendship transitions, own-kudos-only, ±1 challenge counters) and are tested against the emulator. The Gemini key never ships (Firebase AI Logic proxies it).
 
 ## Tech stack
 
 | Layer | Tech |
 | --- | --- |
 | App | Expo SDK 57 · React Native 0.86 (New Architecture) · React 19.2 · TypeScript (strict) |
-| Navigation | expo-router 57 (typed routes, protected routes) |
-| State & storage | Zustand 5 · react-native-mmkv 4 (Nitro) |
-| Animation | Reanimated 4 · Gesture Handler · react-native-svg |
-| Backend | Firebase Auth · Cloud Firestore (rules + indexes in repo) · Firebase Hosting (web) |
-| AI | Gemini 3.5 Flash-Lite (quick log, ~1.5 s) & Gemini 3.5 Flash (coach, reviews) via Firebase AI Logic — schema-constrained JSON, low thinking budget, offline fallback parser |
-| Integrations | GitHub contributions · LeetCode GraphQL · Android Health Connect |
-| Media | Cloudinary (unsigned uploads, on-the-fly thumbnails) |
-| Device | expo-notifications (actions) · expo-haptics · expo-image-picker · expo-keep-awake |
-| Quality | Vitest (domain + sync unit tests) · `@firebase/rules-unit-testing` against the emulator · strict `tsc` · Prettier · GitHub Actions CI |
+| Native | Kotlin Expo module: SensorManager, WorkManager, Play Services Activity Recognition & Fused Location, foreground service, Android 16 `ProgressStyle` Live Updates |
+| Navigation | expo-router (typed, protected routes) |
+| State | Zustand 5 · react-native-mmkv 4 (Nitro) |
+| Motion | Reanimated 4 · Gesture Handler (swipe-to-complete) · react-native-svg |
+| Backend | Firebase Auth (Google + email) · Cloud Firestore · Firebase Hosting |
+| AI | Gemini 3.5 Flash-Lite / Flash via Firebase AI Logic (schema-constrained JSON) · on-device fallback parser · speech recognition |
+| Platform | expo-notifications (actions, channels) · expo-background-task · react-native-android-widget · Health Connect |
+| Design | Custom "Volt" brand system: Inter Tight + Geist Mono, Phosphor icons, ink / bone / volt palette |
+| Quality | Vitest (domain, activity, notification planner, sync) · Firestore rules tests on the emulator · strict `tsc` · Prettier · GitHub Actions |
 
 ## Project structure
 
 ```
+modules/ritual-sensing/   # Kotlin: step ledger, activity recognition, workout service, Live Updates
 src/
-  app/                 # screens (expo-router): (auth), (tabs), habit/, focus/, challenge/, …
-  domain/              # pure TS: dates, schedules, streaks, XP, achievements, insights, NL parser (+ tests)
-  data/                # store (Zustand+MMKV), sync engine, session, auth, hooks
+  app/                    # screens (expo-router)
+  domain/                 # pure TS: dates, streaks, XP, achievements, insights, activity, notification planner (+ tests)
+  data/                   # store, sync engine, session, auth, identity
   features/
-    ai/                # Gemini: quick log, coach, weekly review
-    habits/            # habit rows, log sheet, pickers, logging actions
-    integrations/      # GitHub, LeetCode, Health Connect, auto-tracking engine
-    notifications/     # smart scheduler, notification actions
-    social/            # friends, feed, leaderboards, challenges (Firestore)
-    gamification/      # celebrations
-  ui/                  # design system: theme, Text, Button, Card, Sheet, charts, rings, confetti…
-  lib/                 # firebase, storage, haptics, cloudinary, ids
-firestore.rules        # security rules
-firestore.indexes.json # composite indexes
-tests/rules/           # security-rules test suite (emulator)
-scripts/               # emulator seed data
+    sensing/              # JS side of phone sensing: tracking status, workout recorder UI, background task
+    today/                # day ring, week bars
+    ai/                   # Gemini features, voice input
+    habits/ integrations/ notifications/ social/ gamification/ auth/
+  widget/                 # Android home-screen widget (headless task)
+  ui/                     # design system
+firestore.rules · tests/rules/ · scripts/
 ```
 
 ## Getting started
 
-**Requirements:** Node 20+, JDK 17, Android Studio (SDK + an emulator or a phone with USB debugging).
+**Requirements:** Node 20+, JDK 17+, Android Studio with an emulator or a phone with USB debugging.
 
 ```bash
 npm install
-cp .env.example .env        # fill in Firebase (and optionally Cloudinary) values
+cp .env.example .env        # Firebase, Google sign-in and Cloudinary values
 npm run check               # type-check + unit tests
-npx expo run:android        # builds the dev client and launches it
+npx expo run:android        # builds the dev client with the native modules
 ```
 
-After the first native build you only need `npm start` and the installed dev client. The app runs without any `.env` values too — accounts/social/AI simply switch off and everything stays on the device.
+Without any `.env` values the app still runs fully on-device (accounts, social and AI switch off).
 
-> **Windows tip:** if the native build fails because of a space in the project path, run Gradle from PowerShell or map the folder to a drive letter (`subst R: "C:\path with spaces\Ritual"`).
+### Firebase
 
-### Firebase (free Spark plan)
+1. Create a project at [console.firebase.google.com](https://console.firebase.google.com), **Add app → Web**, and copy the config into `.env`.
+2. **Authentication → Sign-in method**: enable **Email/Password** and **Google**.
+3. **Firestore → Create database**, then `npm run deploy:rules`.
+4. **AI Logic → Get started → Gemini Developer API.**
 
-1. [console.firebase.google.com](https://console.firebase.google.com) → **Create project** (Analytics optional).
-2. **Add app → Web**, copy the config into `.env` (`EXPO_PUBLIC_FIREBASE_*`).
-3. **Authentication → Sign-in method → Email/Password → Enable.**
-4. **Firestore Database → Create database** (production mode, nearest region).
-5. Deploy rules & indexes:
-   ```bash
-   npm i -g firebase-tools
-   firebase login
-   firebase use --add          # pick your project
-   npm run deploy:rules
-   ```
-6. **AI Services → AI Logic → Get started → Gemini Developer API.** (If App Check is enforced for AI Logic, set it to *Unenforced* for development or register an App Check provider.)
+### Google sign-in on Android
 
-### Cloudinary (photo check-ins & avatars)
+1. In Firebase **Authentication → Sign-in method → Google**, copy the **Web client ID** into `.env` as `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`.
+2. **Project settings → Add app → Android**, package `com.genzboy.Ritual`, and add the **SHA-1** of your signing key:
+   - debug builds: `keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android`
+   - EAS builds: `eas credentials` → Android → SHA-1
+3. Rebuild the app. (On the web, Google sign-in works with no extra setup.)
 
-1. Sign up at [cloudinary.com](https://cloudinary.com) (free tier). Your **cloud name** is on the dashboard.
-2. **Settings → Upload → Upload presets → Add upload preset**
-   - Signing mode: **Unsigned**
-   - Folder: `ritual`
-   - Allowed formats: `jpg, png, webp, heic` · Max file size: e.g. `5 MB`
-   - Incoming transformation (optional): `c_limit,w_1600,q_auto`
-3. Put `EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME` and `EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET` in `.env` and restart Metro.
+### Cloudinary (photos and avatars)
 
-### Web demo (Firebase Hosting)
+Create an **unsigned** upload preset and set `EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME` / `EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET`.
+
+### Web demo and APK
 
 ```bash
-npm run deploy:web          # expo export -p web && firebase deploy --only hosting
-```
-
-(LeetCode and Health Connect are mobile-only; GitHub uses the public events API on web.)
-
-### Shareable Android build
-
-```bash
-npm i -g eas-cli && eas login
-npm run build:apk           # EAS "preview" profile → installable APK link
+npm run deploy:web          # export + Firebase Hosting
+npm run build:apk           # EAS preview APK
 ```
 
 ## Testing
 
-| Suite | What it covers | Command |
+| Suite | Covers | Command |
 | --- | --- | --- |
-| Domain unit tests | Dates/DST, daily & weekly streaks, rest days, back-filled history, completion rates, XP & level curve, deterministic snapshots, NL quick-log parser | `npm test` |
-| Sync engine | Outbox queuing, tombstones, last-write-wins merges, ack versioning, guest → account migration | `npm test` |
-| Security rules | 20 attack scenarios against the Firestore emulator — cross-user reads/writes, username theft, self-accepted friendships, forged kudos, counter inflation | `npm run test:rules` |
-| Types | Strict TypeScript across app, scripts and tests | `npm run typecheck` |
-
-All suites run in GitHub Actions on every push.
-
-### Local Firebase (no cloud project needed)
-
-```bash
-npm run emulators            # Auth + Firestore emulators (needs Java 21)
-npm run seed                 # 4 demo users, ~10 weeks of history, friends, feed, a group challenge
-cp .env.emulator.example .env.local
-npm start                    # sign in as demo@ritual.dev (password in scripts/emulator-config.ts)
-```
-
-On Android also forward the ports: `adb reverse tcp:9099 tcp:9099` and `adb reverse tcp:8085 tcp:8085`.
+| Domain | Dates/DST, streaks, rest days, XP & levels, insights, NL parser | `npm test` |
+| Activity | Transition pairing, de-duplicating detected vs recorded workouts, midnight splits, unit mapping, polyline decoding | `npm test` |
+| Notification planner | Calm / Balanced / Coach plans, done habits drop out, quiet hours, last calls, walk nudges, no stacking | `npm test` |
+| Sync | Outbox, tombstones, last-write-wins, ack versions, guest → account migration | `npm test` |
+| Security rules | 20 attack scenarios against the Firestore emulator | `npm run test:rules` |
 
 ## Roadmap
 
-- iOS HealthKit provider and Apple Watch complications
-- Home-screen widgets (check off from the launcher)
-- Push notifications for nudges via Cloud Functions + FCM
+- iOS: HealthKit, Core Motion pedometer, Live Activities and widgets
+- Push nudges between friends via Cloud Functions + FCM
 - Screen-time habits via Android UsageStats
-- End-to-end tests with Maestro
+- Wear OS tile
 
 ---
 

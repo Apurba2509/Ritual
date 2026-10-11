@@ -1,0 +1,88 @@
+-- Merging decision tree log ---
+manifest
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:1:1-31:12
+INJECTED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:1:1-31:12
+	package
+		INJECTED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml
+	xmlns:android
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:1:11-69
+uses-permission#android.permission.ACTIVITY_RECOGNITION
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:3:3-77
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:3:20-74
+uses-permission#android.permission.ACCESS_FINE_LOCATION
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:5:3-77
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:5:20-74
+uses-permission#android.permission.ACCESS_COARSE_LOCATION
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:6:3-79
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:6:20-76
+uses-permission#android.permission.FOREGROUND_SERVICE
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:7:3-75
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:7:20-72
+uses-permission#android.permission.FOREGROUND_SERVICE_LOCATION
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:8:3-84
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:8:20-81
+uses-permission#android.permission.FOREGROUND_SERVICE_HEALTH
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:9:3-82
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:9:20-79
+uses-permission#android.permission.RECEIVE_BOOT_COMPLETED
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:10:3-79
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:10:20-76
+uses-permission#android.permission.WAKE_LOCK
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:11:3-66
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:11:20-63
+uses-permission#android.permission.POST_PROMOTED_NOTIFICATIONS
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:13:3-84
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:13:20-81
+application
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:15:3-30:17
+service#expo.modules.ritualsensing.WorkoutService
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:16:5-19:57
+	android:exported
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:18:7-31
+	android:foregroundServiceType
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:19:7-54
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:17:7-37
+receiver#expo.modules.ritualsensing.TransitionReceiver
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:21:5-77
+	android:exported
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:21:50-74
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:21:15-49
+receiver#expo.modules.ritualsensing.BootReceiver
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:23:5-29:16
+	android:exported
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:23:44-67
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:23:15-43
+intent-filter#action:name:android.intent.action.ACTION_SHUTDOWN+action:name:android.intent.action.BOOT_COMPLETED+action:name:android.intent.action.MY_PACKAGE_REPLACED
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:24:7-28:23
+action#android.intent.action.BOOT_COMPLETED
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:25:9-71
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:25:17-68
+action#android.intent.action.MY_PACKAGE_REPLACED
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:26:9-76
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:26:17-73
+action#android.intent.action.ACTION_SHUTDOWN
+ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:27:9-72
+	android:name
+		ADDED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:27:17-69
+uses-sdk
+INJECTED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml
+INJECTED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml

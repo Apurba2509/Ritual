@@ -17,7 +17,7 @@ export default function ArchiveScreen() {
     <Screen back title="Archived habits" subtitle="Paused habits keep their history and XP.">
       {habits.length === 0 ? (
         <EmptyState
-          emoji="📦"
+          icon="archive"
           title="Nothing archived"
           body="Archive a habit from its edit screen to pause it without losing history."
         />
@@ -31,7 +31,7 @@ export default function ArchiveScreen() {
                 onPress={() => router.push(`/habit/${h.id}`)}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
               >
-                <HabitIcon emoji={h.emoji} color={h.color} size={42} />
+                <HabitIcon icon={h.icon} color={h.color} size={42} />
                 <View style={{ flex: 1 }}>
                   <Text variant="subheading">{h.name}</Text>
                   <Text variant="caption" tone="muted">
@@ -44,7 +44,7 @@ export default function ArchiveScreen() {
                   variant="secondary"
                   onPress={() => {
                     useApp.getState().archiveHabit(h.id, false);
-                    toast(`${h.name} is back on your list`, { emoji: '♻️' });
+                    toast(`${h.name} is back on your list`, { icon: 'arrow-counter-clockwise' });
                   }}
                 />
               </Card>

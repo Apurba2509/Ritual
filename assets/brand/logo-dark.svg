@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="200" viewBox="0 0 760 200">
+  <rect width="760" height="200" fill="#0B0B0C"/>
+  <g transform="translate(36 20) scale(1.6)">
+    <path d="M29 75 V45 A20 20 0 0 1 49 25" fill="none" stroke="#F4F4F1" stroke-width="15" stroke-linecap="round"/>
+    <circle cx="69.5" cy="25" r="8.6" fill="#D4FF3F"/></g>
+  <text x="220.00000000000003" y="140" font-family="Inter Tight" font-weight="800" font-size="124" letter-spacing="-6.800000000000001" fill="#F4F4F1">ritual<tspan fill="#D4FF3F">.</tspan></text>
+</svg>

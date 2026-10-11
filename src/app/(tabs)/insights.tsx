@@ -11,34 +11,58 @@ import { aiConfigured, aiErrorMessage } from '@/features/ai/gemini';
 import { HabitIcon } from '@/features/habits/HabitIcon';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
-import { BarChart, Heatmap, Meter } from '@/ui/charts';
+import { BarChart, Heatmap, Meter, Sparkline } from '@/ui/charts';
 import { Pill } from '@/ui/Chip';
 import { EmptyState } from '@/ui/EmptyState';
-import { Icon } from '@/ui/Icon';
-import { ProgressRing } from '@/ui/ProgressRing';
+import { Icon, IconName, isIconName } from '@/ui/Icon';
 import { Screen, Section } from '@/ui/Screen';
+import { useFrameWidth } from '@/ui/layout';
 import { Segmented } from '@/ui/Segmented';
 import { Text } from '@/ui/Text';
-import { alpha, useTheme } from '@/ui/theme';
+import { tint, useTheme } from '@/ui/theme';
 
 type Range = '7' | '30' | '365';
 
-function Tile({ label, value, emoji, tint }: { label: string; value: string; emoji: string; tint?: string }) {
+function Stat({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const t = useTheme();
   return (
-    <Card style={{ flex: 1, padding: 14, gap: 4 }}>
-      <Text size={18}>{emoji}</Text>
-      <Text variant="number" size={24} color={tint}>
+    <View
+      style={{
+        flex: 1,
+        gap: 4,
+        paddingHorizontal: 14,
+        borderRightWidth: last ? 0 : 1,
+        borderRightColor: t.border,
+      }}
+    >
+      <Text weight="bold" size={26} tabular>
         {value}
       </Text>
-      <Text variant="caption" tone="muted" size={11}>
+      <Text variant="caption" tone="muted">
         {label}
       </Text>
-    </Card>
+    </View>
+  );
+}
+
+function ReviewLine({ icon, label, text }: { icon: IconName; label?: string; text: string }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+      <View style={{ marginTop: 2 }}>
+        <Icon name={icon} size={16} color={t.accentInk} weight="fill" />
+      </View>
+      <Text variant="body" style={{ flex: 1 }}>
+        {label ? <Text variant="bodyStrong">{label} </Text> : null}
+        {text}
+      </Text>
+    </View>
   );
 }
 
 export default function InsightsScreen() {
   const t = useTheme();
+  const width = useFrameWidth();
   const snapshot = useSnapshot();
   const today = useToday();
   const weekStart = useApp((s) => s.settings.weekStart);
@@ -105,6 +129,21 @@ export default function InsightsScreen() {
     });
   }, [range, snapshot, today]);
 
+  // Daily completion for the trend line (weekly averages for the 12-month view).
+  const trend = useMemo(() => {
+    const ratio = (d: DayKey) => {
+      const s = snapshot.days.get(d);
+      return s && s.due ? Math.min(1, s.done / s.due) : null;
+    };
+    if (range !== '365') return Array.from({ length: days }, (_, i) => ratio(addDays(today, i - days + 1)));
+    return Array.from({ length: 52 }, (_, w) => {
+      const vals = Array.from({ length: 7 }, (_, i) => ratio(addDays(today, (w - 51) * 7 + i - 6))).filter(
+        (v): v is number => v !== null,
+      );
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    });
+  }, [range, days, snapshot, today]);
+
   const weekdays = useMemo(() => weekdayRates(snapshot), [snapshot]);
   const insights = useMemo(() => localInsights(snapshot), [snapshot]);
   const moods = useMemo(() => moodLinks(snapshot).slice(0, 3), [snapshot]);
@@ -120,9 +159,9 @@ export default function InsightsScreen() {
     return (
       <Screen title="Insights" bottomInset={110}>
         <EmptyState
-          emoji="📊"
+          icon="chart-line-up"
           title="Nothing to analyse yet"
-          body="Add a habit and check in for a few days — patterns show up here."
+          body="Add a habit and check in for a few days. Patterns show up here."
           action="Add a habit"
           onAction={() => router.push('/habit/edit')}
         />
@@ -131,6 +170,7 @@ export default function InsightsScreen() {
   }
 
   const delta = rate !== null && prevRate !== null ? Math.round((rate - prevRate) * 100) : null;
+  const rangeLabel = range === '365' ? '12 months' : `${range} days`;
 
   const runReview = async () => {
     setReviewing(true);
@@ -155,43 +195,46 @@ export default function InsightsScreen() {
         ]}
       />
 
-      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 18, padding: 18 }}>
-        <ProgressRing progress={rate ?? 0} size={96} stroke={10} color={t.accent} colorEnd="#FBBF24">
-          <Text variant="number" size={24}>
-            {rate === null ? '—' : `${Math.round(rate * 100)}%`}
-          </Text>
-        </ProgressRing>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text variant="heading">Consistency</Text>
-          <Text variant="caption" tone="muted">
-            Share of scheduled habits you completed in the last {range === '365' ? '12 months' : `${range} days`}.
-          </Text>
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <View>
+            <Text variant="caption" weight="semibold" tone="muted">
+              Consistency · {rangeLabel}
+            </Text>
+            <Text weight="heavy" size={72} tabular style={{ lineHeight: 76, letterSpacing: -3.4 }}>
+              {rate === null ? '—' : Math.round(rate * 100)}
+              <Text weight="heavy" size={34} tone="faint">
+                %
+              </Text>
+            </Text>
+          </View>
           {delta !== null ? (
-            <View style={{ flexDirection: 'row' }}>
+            <View style={{ marginBottom: 14 }}>
               <Pill
-                label={`${delta >= 0 ? '+' : ''}${delta} pts vs previous`}
-                color={delta >= 0 ? t.success : t.danger}
-                icon={delta >= 0 ? 'trending-up' : 'trending-down'}
+                label={`${delta >= 0 ? '+' : ''}${delta} pts vs before`}
+                color={delta >= 0 ? t.accentInk : t.danger}
+                icon={delta >= 0 ? 'trend-up' : 'trend-down'}
               />
             </View>
           ) : null}
         </View>
-      </Card>
-
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Tile emoji="✅" label="Check-ins" value={`${completions}`} />
-        <Tile emoji="🌟" label="Perfect days" value={`${perfect}`} />
-        <Tile emoji="⚡" label="XP this week" value={`${snapshot.weeklyXP}`} tint={t.xp} />
+        <Sparkline values={trend} width={width - 40} height={72} />
       </View>
+
+      <Card padded={false} style={{ flexDirection: 'row', paddingVertical: 16 }}>
+        <Stat label="Check-ins" value={`${completions}`} />
+        <Stat label="Perfect days" value={`${perfect}`} />
+        <Stat label="XP this week" value={`${snapshot.weeklyXP}`} last />
+      </Card>
 
       <Section title="Activity">
         <Card>
-          <BarChart data={bars} height={110} formatValue={(v) => `${v}`} />
+          <BarChart data={bars} height={120} formatValue={(v) => `${v}`} />
         </Card>
       </Section>
 
       <Section title="Your year">
-        <Card style={{ gap: 10 }}>
+        <Card style={{ gap: 12 }}>
           <Heatmap
             today={today}
             weeks={52}
@@ -203,13 +246,13 @@ export default function InsightsScreen() {
             }}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-            <Text variant="caption" tone="faint" size={10}>
+            <Text variant="small" tone="faint" size={10}>
               Less
             </Text>
             {t.heat.map((c) => (
-              <View key={c} style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: c }} />
+              <View key={c} style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: c }} />
             ))}
-            <Text variant="caption" tone="faint" size={10}>
+            <Text variant="small" tone="faint" size={10}>
               More
             </Text>
           </View>
@@ -219,48 +262,60 @@ export default function InsightsScreen() {
       <Section title="AI weekly review">
         {review ? (
           <Animated.View entering={FadeInDown.springify().damping(18)}>
-            <Card style={{ gap: 10, borderColor: alpha(t.xp, 0.4) }}>
+            <Card style={{ gap: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Icon name="zap" size={16} color={t.xp} />
-                <Text variant="subheading" style={{ flex: 1 }}>
-                  {review.headline}
+                <Icon name="sparkle" size={18} color={t.accentInk} weight="fill" />
+                <Text variant="label" tone="muted">
+                  This week
                 </Text>
               </View>
-              {review.wins.map((w) => (
-                <Text key={w} variant="caption">
-                  🏆 {w}
-                </Text>
-              ))}
-              <Text variant="caption">
-                🎯{' '}
-                <Text variant="caption" style={{ fontFamily: 'Inter_600SemiBold' }}>
-                  Focus:
-                </Text>{' '}
-                {review.focus}
-              </Text>
-              <Text variant="caption">
-                🧪{' '}
-                <Text variant="caption" style={{ fontFamily: 'Inter_600SemiBold' }}>
-                  Try:
-                </Text>{' '}
-                {review.experiment}
-              </Text>
+              <Text variant="heading">{review.headline}</Text>
+              <View style={{ gap: 10 }}>
+                {review.wins.map((w) => (
+                  <ReviewLine key={w} icon="trophy" text={w} />
+                ))}
+                <ReviewLine icon="target" label="Focus:" text={review.focus} />
+                <ReviewLine icon="flask" label="Try:" text={review.experiment} />
+              </View>
+              <Button
+                title="Regenerate"
+                icon="arrows-clockwise"
+                variant="ghost"
+                size="sm"
+                onPress={runReview}
+                loading={reviewing}
+                style={{ alignSelf: 'flex-start', marginLeft: -12 }}
+              />
             </Card>
           </Animated.View>
         ) : (
-          <Card style={{ gap: 10 }}>
-            <Text tone="muted">
-              {aiConfigured
-                ? 'Gemini reads your numbers and writes a short, honest review with one experiment for next week.'
-                : 'Connect Firebase AI Logic to unlock AI reviews. Your on-device insights are below.'}
-            </Text>
+          <Card style={{ gap: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  backgroundColor: t.accentSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="sparkle" size={22} color={t.accentInk} weight="fill" />
+              </View>
+              <Text variant="caption" tone="muted" style={{ flex: 1 }}>
+                {aiConfigured
+                  ? 'Gemini reads your numbers and writes a short, honest review with one experiment for next week.'
+                  : 'AI reviews need Firebase AI Logic. Your on-device patterns are below.'}
+              </Text>
+            </View>
             {reviewError ? (
               <Text variant="caption" tone="danger">
                 {reviewError}
               </Text>
             ) : null}
             {aiConfigured ? (
-              <Button title="Generate my review" icon="zap" variant="xp" loading={reviewing} onPress={runReview} />
+              <Button title="Write my review" icon="sparkle" loading={reviewing} onPress={runReview} full />
             ) : null}
           </Card>
         )}
@@ -270,12 +325,26 @@ export default function InsightsScreen() {
         <Section title="Patterns">
           <View style={{ gap: 8 }}>
             {insights.map((i) => (
-              <Card key={i.id} style={{ flexDirection: 'row', gap: 12 }}>
-                <Text size={22}>{i.emoji}</Text>
+              <Card key={i.id} style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    backgroundColor: i.tone === 'warn' ? `${t.warning}22` : t.surface2,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon
+                    name={isIconName(i.icon) ? i.icon : 'sparkle'}
+                    size={20}
+                    color={i.tone === 'warn' ? t.warning : t.text}
+                    weight="duotone"
+                  />
+                </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text variant="bodyStrong" color={i.tone === 'warn' ? t.warning : undefined}>
-                    {i.title}
-                  </Text>
+                  <Text variant="bodyStrong">{i.title}</Text>
                   <Text variant="caption" tone="muted">
                     {i.body}
                   </Text>
@@ -286,36 +355,50 @@ export default function InsightsScreen() {
         </Section>
       ) : null}
 
-      <Section title="By weekday (last 12 weeks)">
+      <Section title="By weekday · last 12 weeks">
         <Card>
           <BarChart
-            height={80}
-            color={t.xp}
+            height={90}
             max={1}
             formatValue={(v) => `${Math.round(v * 100)}`}
             data={orderedWeekdays(weekStart).map((wd) => ({
               label: WEEKDAY_SHORT[wd].slice(0, 2),
               value: weekdays[wd] ?? 0,
               faded: weekdays[wd] === null,
+              highlight: weekdays[wd] !== null && weekdays[wd] === Math.max(...weekdays.map((w) => w ?? 0)),
             }))}
           />
         </Card>
       </Section>
 
       <Section title="Habits · last 30 days">
-        <Card style={{ gap: 14 }}>
+        <Card style={{ gap: 16 }}>
           {habitRows.map((s) => (
-            <View key={s.habit.id} style={{ gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <HabitIcon emoji={s.habit.emoji} color={s.habit.color} size={30} />
+            <View key={s.habit.id} style={{ gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <HabitIcon icon={s.habit.icon} color={s.habit.color} size={32} />
                 <Text variant="bodyStrong" style={{ flex: 1 }} numberOfLines={1}>
                   {s.habit.name}
                 </Text>
-                <Text variant="caption" tone="muted">
-                  🔥 {s.streak.current} · {s.rate30 === null ? '—' : `${Math.round(s.rate30 * 100)}%`}
+                {s.streak.current > 0 ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                    <Icon name="fire" size={12} color={t.accentInk} weight="fill" />
+                    <Text variant="caption" weight="bold" tabular>
+                      {s.streak.current}
+                    </Text>
+                  </View>
+                ) : null}
+                <Text
+                  variant="caption"
+                  weight="semibold"
+                  tone="muted"
+                  tabular
+                  style={{ width: 40, textAlign: 'right' }}
+                >
+                  {s.rate30 === null ? '—' : `${Math.round(s.rate30 * 100)}%`}
                 </Text>
               </View>
-              <Meter ratio={s.rate30 ?? 0} color={s.habit.color} height={6} />
+              <Meter ratio={s.rate30 ?? 0} color={tint(s.habit.color, t)} height={6} />
             </View>
           ))}
         </Card>
@@ -323,21 +406,24 @@ export default function InsightsScreen() {
 
       {moods.length ? (
         <Section title="Mood links">
-          <Card style={{ gap: 10 }}>
+          <Card style={{ gap: 14 }}>
             {moods.map((m) => {
               const h = snapshot.habitStats.get(m.habitId)!.habit;
               const diff = m.withHabit - m.without;
               return (
-                <View key={m.habitId} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Text size={18}>{h.emoji}</Text>
+                <View key={m.habitId} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <HabitIcon icon={h.icon} color={h.color} size={32} />
                   <Text variant="caption" style={{ flex: 1 }}>
                     Mood on {h.name} days:{' '}
-                    <Text variant="caption" style={{ fontFamily: 'Inter_600SemiBold' }}>
+                    <Text variant="caption" weight="bold">
                       {m.withHabit.toFixed(1)}
                     </Text>{' '}
                     vs {m.without.toFixed(1)}
                   </Text>
-                  <Pill label={`${diff >= 0 ? '+' : ''}${diff.toFixed(1)}`} color={diff >= 0 ? t.success : t.danger} />
+                  <Pill
+                    label={`${diff >= 0 ? '+' : ''}${diff.toFixed(1)}`}
+                    color={diff >= 0 ? t.accentInk : t.danger}
+                  />
                 </View>
               );
             })}

@@ -8,7 +8,7 @@ import { Meter } from '@/ui/charts';
 import { Pill } from '@/ui/Chip';
 import { Screen } from '@/ui/Screen';
 import { Text } from '@/ui/Text';
-import { alpha, radius } from '@/ui/theme';
+import { AchievementBadge } from '@/features/gamification/Badge';
 
 export default function AchievementsScreen() {
   const snapshot = useSnapshot();
@@ -31,36 +31,21 @@ export default function AchievementsScreen() {
           const color = TIER_COLORS[a.tier];
           return (
             <Animated.View key={a.id} entering={FadeInDown.delay(Math.min(i, 10) * 30)}>
-              <Card style={{ flexDirection: 'row', gap: 14, alignItems: 'center', opacity: got ? 1 : 0.75 }}>
-                <View
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: radius.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: got ? alpha(color, 0.18) : 'rgba(127,127,127,0.1)',
-                    borderWidth: 1.5,
-                    borderColor: got ? color : 'rgba(127,127,127,0.2)',
-                  }}
-                >
-                  <Text size={28} style={{ opacity: got ? 1 : 0.35 }}>
-                    {got ? a.emoji : '🔒'}
-                  </Text>
-                </View>
+              <Card style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+                <AchievementBadge achievement={a} unlocked={got} size={52} />
                 <View style={{ flex: 1, gap: 4 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text variant="subheading" style={{ flexShrink: 1 }}>
                       {a.title}
                     </Text>
-                    <Pill label={a.tier} color={color} />
+                    <Pill label={a.tier[0].toUpperCase() + a.tier.slice(1)} color={color} />
                   </View>
                   <Text variant="caption" tone="muted">
                     {a.description}
                     {a.xp ? ` · +${a.xp} XP` : ''}
                   </Text>
                   {got ? (
-                    <Text variant="caption" tone="faint" size={11}>
+                    <Text variant="caption" tone="accent" weight="semibold" size={11}>
                       Unlocked{' '}
                       {new Date(unlocked[a.id]).toLocaleDateString(undefined, {
                         month: 'short',
@@ -70,8 +55,8 @@ export default function AchievementsScreen() {
                     </Text>
                   ) : goal > 1 ? (
                     <View style={{ gap: 4 }}>
-                      <Meter ratio={cur / goal} color={color} height={5} />
-                      <Text variant="caption" tone="faint" size={11}>
+                      <Meter ratio={cur / goal} height={5} />
+                      <Text variant="caption" tone="faint" size={11} tabular>
                         {cur} / {goal}
                       </Text>
                     </View>

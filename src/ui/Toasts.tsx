@@ -3,9 +3,10 @@ import { View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toast, useUI } from '@/data/ui';
+import { Icon } from './Icon';
 import { Tap } from './Tap';
 import { Text } from './Text';
-import { radius, useTheme, shadow } from './theme';
+import { brand, radius, shadow, useTheme } from './theme';
 
 function ToastItem({ toast }: { toast: Toast }) {
   const t = useTheme();
@@ -15,13 +16,16 @@ function ToastItem({ toast }: { toast: Toast }) {
     return () => clearTimeout(id);
   }, [toast.id, toast.action, dismiss]);
 
-  const accent = toast.tone === 'success' ? t.success : toast.tone === 'error' ? t.danger : t.accent;
+  // Always a dark pill — it floats over content in both themes.
+  const icon = toast.icon ?? (toast.tone === 'error' ? 'warning' : toast.tone === 'success' ? 'check-circle' : 'info');
+  const iconColor = toast.tone === 'error' ? '#FF6B5E' : brand.volt;
 
   return (
     <Animated.View
       entering={FadeInUp.springify().damping(18)}
       exiting={FadeOutUp.duration(180)}
       layout={LinearTransition}
+      style={{ alignItems: 'center' }}
     >
       <Tap
         onPress={() => dismiss(toast.id)}
@@ -31,18 +35,19 @@ function ToastItem({ toast }: { toast: Toast }) {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 10,
-          paddingVertical: 12,
-          paddingHorizontal: 14,
-          borderRadius: radius.lg,
-          backgroundColor: t.scheme === 'dark' ? t.surface3 : '#18181B',
+          paddingVertical: 11,
+          paddingLeft: 14,
+          paddingRight: toast.action ? 8 : 16,
+          borderRadius: radius.pill,
+          backgroundColor: t.scheme === 'dark' ? '#232325' : '#141415',
           borderWidth: 1,
-          borderColor: t.borderStrong,
-          ...shadow('#000000', 0.3, 18, 8),
+          borderColor: 'rgba(255,255,255,0.08)',
+          maxWidth: 420,
+          ...shadow('#000000', 0.35, 24, 10),
         }}
       >
-        <View style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: accent }} />
-        {toast.emoji ? <Text size={18}>{toast.emoji}</Text> : null}
-        <Text variant="bodyStrong" color="#F5F5F7" style={{ flex: 1 }} size={14}>
+        <Icon name={icon} size={18} color={iconColor} weight="fill" />
+        <Text variant="bodyStrong" color={brand.bone} size={14} style={{ flexShrink: 1 }}>
           {toast.message}
         </Text>
         {toast.action ? (
@@ -52,8 +57,16 @@ function ToastItem({ toast }: { toast: Toast }) {
               dismiss(toast.id);
             }}
             hitSlop={10}
+            style={{
+              marginLeft: 4,
+              paddingHorizontal: 12,
+              height: 30,
+              borderRadius: 15,
+              backgroundColor: brand.volt,
+              justifyContent: 'center',
+            }}
           >
-            <Text variant="bodyStrong" color={t.accent} size={14}>
+            <Text variant="caption" weight="bold" color={brand.ink}>
               {toast.action.label}
             </Text>
           </Tap>

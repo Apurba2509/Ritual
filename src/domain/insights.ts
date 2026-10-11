@@ -83,7 +83,7 @@ export function moodLinks(snapshot: Snapshot): MoodLink[] {
 
 export interface Insight {
   id: string;
-  emoji: string;
+  icon: string;
   title: string;
   body: string;
   tone: 'good' | 'warn' | 'info';
@@ -103,7 +103,7 @@ export function localInsights(snapshot: Snapshot): Insight[] {
     const up = thisWeek > lastWeek;
     out.push({
       id: 'trend',
-      emoji: up ? '📈' : '📉',
+      icon: up ? 'trend-up' : 'chart-line-up',
       title: up ? 'Trending up' : 'Slipping a little',
       body: `${pct(thisWeek)} of habits done in the last 7 days vs ${pct(lastWeek)} the week before.`,
       tone: up ? 'good' : 'warn',
@@ -119,7 +119,7 @@ export function localInsights(snapshot: Snapshot): Insight[] {
     if (best.r - worst.r >= 0.15) {
       out.push({
         id: 'weekday',
-        emoji: '🗓️',
+        icon: 'calendar-blank',
         title: `${WEEKDAY_LONG[worst.i]}s are your weak spot`,
         body: `You hit ${pct(worst.r)} on ${WEEKDAY_LONG[worst.i]}s vs ${pct(best.r)} on ${WEEKDAY_LONG[best.i]}s. Try a lighter plan or an earlier reminder that day.`,
         tone: 'info',
@@ -134,7 +134,7 @@ export function localInsights(snapshot: Snapshot): Insight[] {
     const low = sorted[sorted.length - 1];
     out.push({
       id: 'top',
-      emoji: top.habit.emoji,
+      icon: top.habit.icon,
       title: `${top.habit.name} is locked in`,
       body: `${pct(top.rate30!)} over the last 30 days — your most consistent habit.`,
       tone: 'good',
@@ -142,7 +142,7 @@ export function localInsights(snapshot: Snapshot): Insight[] {
     if (low.rate30! < 0.6) {
       out.push({
         id: 'low',
-        emoji: low.habit.emoji,
+        icon: low.habit.icon,
         title: `${low.habit.name} needs attention`,
         body: `Only ${pct(low.rate30!)} in 30 days. Shrink it: a smaller target you can't fail beats a big one you skip.`,
         tone: 'warn',
@@ -155,7 +155,7 @@ export function localInsights(snapshot: Snapshot): Insight[] {
     if (next && s.streak.current > 0 && next - s.streak.current <= 3) {
       out.push({
         id: `milestone-${s.habit.id}`,
-        emoji: '🎯',
+        icon: 'target',
         title: `${next - s.streak.current} ${s.streak.unit}${next - s.streak.current > 1 ? 's' : ''} to a milestone`,
         body: `${s.habit.name} is at ${s.streak.current}. Hit ${next} for bonus XP.`,
         tone: 'info',
@@ -169,7 +169,7 @@ export function localInsights(snapshot: Snapshot): Insight[] {
     const h = snapshot.habitStats.get(mood.habitId)!.habit;
     out.push({
       id: 'mood',
-      emoji: '😊',
+      icon: 'smiley',
       title: `${h.name} lifts your mood`,
       body: `Average mood ${mood.withHabit.toFixed(1)}/5 on days you do it vs ${mood.without.toFixed(1)}/5 when you don't.`,
       tone: 'good',

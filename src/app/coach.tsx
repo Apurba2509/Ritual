@@ -16,20 +16,20 @@ import { rescheduleSoon, requestNotificationPermission } from '@/features/notifi
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Chip, Pill } from '@/ui/Chip';
-import { Icon } from '@/ui/Icon';
+import { Icon, IconName } from '@/ui/Icon';
 import { Screen, Section } from '@/ui/Screen';
 import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
 import { useTheme } from '@/ui/theme';
 
-const GOALS = [
-  { emoji: '🏃', text: 'Run my first 10K in 3 months' },
-  { emoji: '💼', text: 'Crack coding interviews by next semester' },
-  { emoji: '😴', text: 'Fix my sleep and wake up with energy' },
-  { emoji: '📚', text: 'Read 24 books this year' },
-  { emoji: '🧘', text: 'Feel less anxious and more focused' },
-  { emoji: '💪', text: 'Build muscle and eat better' },
+const GOALS: { icon: IconName; text: string }[] = [
+  { icon: 'person-simple-run', text: 'Run my first 10K in 3 months' },
+  { icon: 'code', text: 'Crack coding interviews by next semester' },
+  { icon: 'moon-stars', text: 'Fix my sleep and wake up with energy' },
+  { icon: 'books', text: 'Read 24 books this year' },
+  { icon: 'flower-lotus', text: 'Feel less anxious and more focused' },
+  { icon: 'barbell', text: 'Build muscle and eat better' },
 ];
 
 /** Offline fallback: curated bundles keyed by goal words. */
@@ -40,7 +40,7 @@ function localPlan(goal: string): CoachPlan {
       .map((id) => TEMPLATE_BY_ID.get(id)!)
       .map<CoachHabit>((tpl) => ({
         name: tpl.name,
-        emoji: tpl.emoji,
+        icon: tpl.icon,
         kind: tpl.kind,
         target: tpl.target,
         unit: tpl.unit,
@@ -125,7 +125,7 @@ export default function CoachScreen() {
       if (!picked.has(i)) return;
       app.createHabit({
         name: h.name,
-        emoji: h.emoji,
+        icon: h.icon,
         color: h.color,
         kind: h.kind,
         target: h.target,
@@ -142,29 +142,27 @@ export default function CoachScreen() {
     });
     await requestNotificationPermission();
     rescheduleSoon(300);
-    toast(`${n} habit${n > 1 ? 's' : ''} added to your ritual`, { emoji: '🧭', tone: 'success' });
+    toast(`${n} habit${n > 1 ? 's' : ''} added to your ritual`, { icon: 'magic-wand', tone: 'success' });
     router.back();
   };
 
   return (
-    <Screen back="close" title="AI coach">
-      <Text tone="muted">
-        Describe a goal. The coach designs a few small, specific habits that compound toward it — grounded in behaviour
-        science.
-      </Text>
-
+    <Screen
+      back="close"
+      title="AI coach"
+      subtitle="Describe a goal. The coach designs a few small, specific habits that compound toward it."
+    >
       <TextField
         value={goal}
         onChangeText={setGoal}
         placeholder="I want to…"
         multiline
         maxLength={300}
-        icon="compass"
+        icon="magic-wand"
       />
       <Button
         title={busy ? 'Designing your plan…' : 'Build my plan'}
-        icon="zap"
-        variant="xp"
+        icon="sparkle"
         size="lg"
         full
         loading={busy}
@@ -179,13 +177,24 @@ export default function CoachScreen() {
               <Card
                 key={g.text}
                 onPress={() => generate(g.text)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 }}
               >
-                <Text size={22}>{g.emoji}</Text>
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 12,
+                    backgroundColor: t.surface2,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon name={g.icon} size={20} color={t.text} weight="duotone" duotoneColor={t.accentInk} />
+                </View>
                 <Text variant="bodyStrong" style={{ flex: 1 }}>
                   {g.text}
                 </Text>
-                <Icon name="arrow-right" size={16} color={t.textFaint} />
+                <Icon name="arrow-up-right" size={16} color={t.textFaint} />
               </Card>
             ))}
           </View>
@@ -200,8 +209,8 @@ export default function CoachScreen() {
             </Text>
             <Pill
               label={engine === 'ai' ? 'Gemini' : 'Curated'}
-              color={engine === 'ai' ? t.xp : t.textMuted}
-              icon={engine === 'ai' ? 'zap' : 'book'}
+              color={engine === 'ai' ? t.accentInk : t.textMuted}
+              icon={engine === 'ai' ? 'sparkle' : 'books'}
             />
           </View>
           <Text tone="muted">{plan.summary}</Text>
@@ -225,23 +234,28 @@ export default function CoachScreen() {
                   padding: 14,
                   borderRadius: 20,
                   backgroundColor: t.surface,
-                  borderWidth: 1.5,
-                  borderColor: on ? h.color : t.border,
+                  borderWidth: on ? 2 : 1,
+                  borderColor: on ? (t.scheme === 'dark' ? t.accent : t.text) : t.border,
                   opacity: on ? 1 : 0.6,
                 }}
               >
-                <HabitIcon emoji={h.emoji} color={h.color} size={44} filled={on} />
+                <HabitIcon icon={h.icon} color={h.color} size={44} />
                 <View style={{ flex: 1, gap: 3 }}>
                   <Text variant="subheading">{h.name}</Text>
                   <Text variant="caption" tone="muted">
                     {h.kind === 'check' ? 'Yes/No' : formatAmount(h, h.target)} · {scheduleLabel(h.schedule)}
-                    {h.reminder ? ` · ⏰ ${formatTime(h.reminder)}` : ''}
+                    {h.reminder ? ` · ${formatTime(h.reminder)}` : ''}
                   </Text>
                   <Text variant="caption" tone="faint">
                     {h.why}
                   </Text>
                 </View>
-                <Icon name={on ? 'check-circle' : 'circle'} size={22} color={on ? h.color : t.textFaint} />
+                <Icon
+                  name={on ? 'check-circle' : 'plus-circle'}
+                  size={24}
+                  color={on ? t.accentInk : t.textFaint}
+                  weight={on ? 'fill' : 'regular'}
+                />
               </Tap>
             );
           })}
@@ -251,9 +265,12 @@ export default function CoachScreen() {
                 Coach tips
               </Text>
               {plan.tips.map((tip) => (
-                <Text key={tip} variant="caption">
-                  • {tip}
-                </Text>
+                <View key={tip} style={{ flexDirection: 'row', gap: 8 }}>
+                  <Icon name="lightbulb" size={15} color={t.accentInk} weight="fill" />
+                  <Text variant="caption" style={{ flex: 1 }}>
+                    {tip}
+                  </Text>
+                </View>
               ))}
             </Card>
           ) : null}
@@ -265,7 +282,7 @@ export default function CoachScreen() {
             disabled={!picked.size}
             onPress={add}
           />
-          <Button title="Try a different plan" variant="ghost" icon="refresh-cw" onPress={() => generate()} />
+          <Button title="Try a different plan" variant="ghost" icon="arrows-clockwise" onPress={() => generate()} />
         </Animated.View>
       ) : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>

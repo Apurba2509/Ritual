@@ -1,38 +1,64 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Platform, ScrollView, View } from 'react-native';
-import { HABIT_COLORS, TEMPLATE_BY_ID, TEMPLATES, HabitTemplate, CATEGORIES } from '@/domain/catalog';
+import {
+  CATEGORIES,
+  DEFAULT_HABIT_ICON,
+  HABIT_TINT_KEYS,
+  HabitTemplate,
+  TEMPLATE_BY_ID,
+  TEMPLATES,
+} from '@/domain/catalog';
 import { orderedWeekdays, WEEKDAY_SHORT } from '@/domain/dates';
 import { scheduleLabel } from '@/domain/habits';
-import type { AutoSource, CategoryId, Difficulty, HabitKind, HealthMetric, Schedule } from '@/domain/types';
+import type {
+  AutoSource,
+  CategoryId,
+  DeviceMetric,
+  Difficulty,
+  HabitKind,
+  HealthMetric,
+  Schedule,
+} from '@/domain/types';
 import { BASE_XP } from '@/domain/xp';
 import { useApp } from '@/data/store';
 import { toast } from '@/data/ui';
 import { formatAmount } from '@/features/habits/format';
 import { HabitIcon } from '@/features/habits/HabitIcon';
-import { EmojiSheet, formatTime, TimeSheet } from '@/features/habits/pickers';
+import { formatTime, IconSheet, TimeSheet } from '@/features/habits/pickers';
+import { autoForTemplate } from '@/features/integrations/autoFor';
 import { syncHabitNow } from '@/features/integrations/engine';
 import { isValidGithubUsername } from '@/features/integrations/github';
 import { healthSupported, requestHealthPermissions } from '@/features/integrations/health';
 import { leetcodeSupported } from '@/features/integrations/leetcode';
 import { rescheduleSoon, requestNotificationPermission } from '@/features/notifications/scheduler';
+import { enableAutoSensing, sensingSupported } from '@/features/sensing';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Chip } from '@/ui/Chip';
-import { Icon } from '@/ui/Icon';
+import { Icon, IconName, isIconName } from '@/ui/Icon';
 import { Screen, Section } from '@/ui/Screen';
 import { Segmented } from '@/ui/Segmented';
 import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
-import { useTheme } from '@/ui/theme';
+import { tint, useTheme } from '@/ui/theme';
 
-type AutoChoice = 'none' | 'github' | 'leetcode' | HealthMetric;
+type AutoChoice = 'none' | 'github' | 'leetcode' | HealthMetric | `dev-${DeviceMetric}`;
 
 function autoToChoice(a: AutoSource | null): AutoChoice {
   if (!a) return 'none';
   if (a.provider === 'health') return a.metric;
+  if (a.provider === 'device') return `dev-${a.metric}`;
   return a.provider;
+}
+
+function templateChoice(tpl: HabitTemplate | undefined): AutoChoice {
+  if (!tpl) return 'none';
+  const auto = autoForTemplate(tpl);
+  if (auto) return autoToChoice(auto);
+  if (tpl.autoHint === 'github' || (tpl.autoHint === 'leetcode' && leetcodeSupported)) return tpl.autoHint;
+  return 'none';
 }
 
 export default function EditHabitScreen() {
@@ -45,8 +71,8 @@ export default function EditHabitScreen() {
 
   const seed = existing ?? template;
   const [name, setName] = useState(seed?.name ?? '');
-  const [emoji, setEmoji] = useState(seed?.emoji ?? '✨');
-  const [color, setColor] = useState(seed?.color ?? HABIT_COLORS[0]);
+  const [icon, setIcon] = useState(seed?.icon ?? DEFAULT_HABIT_ICON);
+  const [color, setColor] = useState<string>(seed?.color ?? 'lime');
   const [kind, setKind] = useState<HabitKind>(seed?.kind ?? 'check');
   const [target, setTarget] = useState(String(seed?.target ?? 1));
   const [unit, setUnit] = useState(seed?.unit ?? '');
@@ -56,14 +82,10 @@ export default function EditHabitScreen() {
   const [reminders, setReminders] = useState<string[]>(existing?.reminders ?? (template ? ['09:00'] : []));
   const [intention, setIntention] = useState(existing?.intention ?? '');
   const [autoChoice, setAutoChoice] = useState<AutoChoice>(
-    existing
-      ? autoToChoice(existing.auto)
-      : template?.autoHint === 'health'
-        ? (template.autoMetric ?? 'none')
-        : (template?.autoHint ?? 'none'),
+    existing ? autoToChoice(existing.auto) : templateChoice(template),
   );
   const [autoUser, setAutoUser] = useState(
-    existing?.auto && existing.auto.provider !== 'health'
+    existing?.auto && (existing.auto.provider === 'github' || existing.auto.provider === 'leetcode')
       ? existing.auto.username
       : template?.autoHint === 'github'
         ? (integrations.github?.username ?? '')
@@ -71,13 +93,14 @@ export default function EditHabitScreen() {
           ? (integrations.leetcode?.username ?? '')
           : '',
   );
-  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [iconOpen, setIconOpen] = useState(false);
+  const [more, setMore] = useState(!!existing?.intention);
   const [timeOpen, setTimeOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const applyTemplate = (tpl: HabitTemplate) => {
     setName(tpl.name);
-    setEmoji(tpl.emoji);
+    setIcon(tpl.icon);
     setColor(tpl.color);
     setKind(tpl.kind);
     setTarget(String(tpl.target));
@@ -86,39 +109,57 @@ export default function EditHabitScreen() {
     setDifficulty(tpl.difficulty);
     setCategory(tpl.category);
     if (!reminders.length) setReminders(['09:00']);
-    if (tpl.autoHint === 'health') setAutoChoice(healthSupported ? (tpl.autoMetric ?? 'none') : 'none');
-    else if (tpl.autoHint) {
-      setAutoChoice(tpl.autoHint);
-      const linked = tpl.autoHint === 'github' ? integrations.github?.username : integrations.leetcode?.username;
+    const choice = templateChoice(tpl);
+    setAutoChoice(choice);
+    if (choice === 'github' || choice === 'leetcode') {
+      const linked = choice === 'github' ? integrations.github?.username : integrations.leetcode?.username;
       if (linked) setAutoUser(linked);
-    } else setAutoChoice('none');
+    }
   };
 
   const targetNum = Math.max(1, Number(target.replace(',', '.')) || 1);
-  const autoSource: AutoSource | null = useMemo(() => {
+  const autoSource: AutoSource | null = useMemo((): AutoSource | null => {
     if (autoChoice === 'none') return null;
     if (autoChoice === 'github' || autoChoice === 'leetcode') {
       return autoUser.trim() ? { provider: autoChoice, username: autoUser.trim() } : null;
     }
-    return { provider: 'health', metric: autoChoice };
+    if (autoChoice.startsWith('dev-')) return { provider: 'device', metric: autoChoice.slice(4) as DeviceMetric };
+    return { provider: 'health', metric: autoChoice as HealthMetric };
   }, [autoChoice, autoUser]);
 
-  const autoOptions: { value: AutoChoice; label: string; emoji: string }[] = [
-    { value: 'none', label: 'Manual', emoji: '✋' },
-    { value: 'github', label: 'GitHub', emoji: '🐙' },
-    ...(leetcodeSupported ? [{ value: 'leetcode' as const, label: 'LeetCode', emoji: '🧩' }] : []),
+  const autoOptions: { value: AutoChoice; label: string; icon: IconName }[] = [
+    { value: 'none', label: 'Manual', icon: 'hand-waving' },
+    ...(sensingSupported
+      ? [
+          { value: 'dev-steps' as const, label: 'Phone steps', icon: 'footprints' as IconName },
+          { value: 'dev-walk' as const, label: 'Walks', icon: 'person-simple-walk' as IconName },
+          { value: 'dev-run' as const, label: 'Runs', icon: 'person-simple-run' as IconName },
+          { value: 'dev-ride' as const, label: 'Rides', icon: 'person-simple-bike' as IconName },
+        ]
+      : []),
+    { value: 'github', label: 'GitHub', icon: 'github-logo' },
+    ...(leetcodeSupported ? [{ value: 'leetcode' as const, label: 'LeetCode', icon: 'code' as IconName }] : []),
     ...(healthSupported
       ? [
-          { value: 'steps' as const, label: 'Steps', emoji: '🚶' },
-          { value: 'exercise' as const, label: 'Workouts', emoji: '🏋️' },
-          { value: 'sleep' as const, label: 'Sleep', emoji: '😴' },
+          { value: 'steps' as const, label: 'Health steps', icon: 'heartbeat' as IconName },
+          { value: 'exercise' as const, label: 'Workouts', icon: 'heartbeat' as IconName },
+          { value: 'sleep' as const, label: 'Sleep', icon: 'moon-stars' as IconName },
         ]
       : []),
   ];
 
   const pickAuto = (choice: AutoChoice) => {
     setAutoChoice(choice);
-    if (choice === 'steps') {
+    if (choice === 'dev-steps') {
+      setKind('count');
+      setUnit('steps');
+      if (targetNum < 1000) setTarget('8000');
+    } else if (choice === 'dev-walk' || choice === 'dev-run' || choice === 'dev-ride') {
+      if (kind === 'count' && !/km|mi|step/i.test(unit)) {
+        setKind('duration');
+        if (targetNum < 5) setTarget('30');
+      }
+    } else if (choice === 'steps') {
       setKind('count');
       setUnit('steps');
       if (targetNum < 1000) setTarget('8000');
@@ -155,7 +196,7 @@ export default function EditHabitScreen() {
     const app = useApp.getState();
     const data = {
       name: name.trim(),
-      emoji,
+      icon,
       color,
       kind,
       target: kind === 'check' ? 1 : targetNum,
@@ -175,6 +216,10 @@ export default function EditHabitScreen() {
       app.setIntegration('github', { username: autoSource.username, lastSyncAt: null, error: null });
     if (autoSource?.provider === 'leetcode')
       app.setIntegration('leetcode', { username: autoSource.username, lastSyncAt: null, error: null });
+    if (autoSource?.provider === 'device') {
+      const res = await enableAutoSensing().catch(() => ({ steps: false, activity: false }));
+      if (!res.steps && !res.activity) toast('Allow Physical activity so your phone can track this', { tone: 'error' });
+    }
     if (autoSource?.provider === 'health') {
       const ok = await requestHealthPermissions().catch(() => false);
       if (!ok) toast('Health Connect permission is needed for auto-tracking', { tone: 'error' });
@@ -186,12 +231,13 @@ export default function EditHabitScreen() {
     if (habit?.auto) {
       syncHabitNow(habit)
         .then(
-          (n) => n > 0 && toast(`Imported ${n} day${n > 1 ? 's' : ''} of history`, { emoji: '⚡', tone: 'success' }),
+          (n) =>
+            n > 0 && toast(`Imported ${n} day${n > 1 ? 's' : ''} of history`, { icon: 'lightning', tone: 'success' }),
         )
         .catch((e) => toast(e instanceof Error ? e.message : 'Sync failed', { tone: 'error' }));
     }
     setSaving(false);
-    if (!existing) toast(`${emoji} ${name.trim()} added`, { tone: 'success' });
+    if (!existing) toast(`${name.trim()} added`, { tone: 'success' });
     router.back();
   };
 
@@ -221,58 +267,96 @@ export default function EditHabitScreen() {
 
   return (
     <>
-      <Screen back="close" title={isEdit ? 'Edit habit' : 'New habit'}>
-        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <Tap onPress={() => setEmojiOpen(true)} scaleTo={0.9} accessibilityLabel="Change icon">
-            <HabitIcon emoji={emoji} color={color} size={58} filled />
+      <Screen
+        back="close"
+        title={isEdit ? 'Edit habit' : 'New habit'}
+        footer={
+          <Button title={isEdit ? 'Save changes' : 'Create habit'} size="lg" full loading={saving} onPress={save} />
+        }
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <Tap onPress={() => setIconOpen(true)} scaleTo={0.9} accessibilityLabel="Change icon">
+            <HabitIcon icon={icon} color={color} size={62} />
+            <View
+              style={{
+                position: 'absolute',
+                right: -4,
+                bottom: -4,
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                backgroundColor: t.surface3,
+                borderWidth: 2.5,
+                borderColor: t.bg,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="pencil-simple" size={11} color={t.text} />
+            </View>
           </Tap>
           <View style={{ flex: 1 }}>
-            <Text variant="heading" numberOfLines={1}>
-              {name || 'Your new habit'}
-            </Text>
-            <Text variant="caption" tone="muted">
-              {kind === 'check'
-                ? 'Done / not done'
-                : `Target ${formatAmount({ kind, unit: kind === 'duration' ? 'min' : unit }, targetNum)}`}{' '}
-              · {scheduleLabel(schedule)}
-            </Text>
+            <TextField
+              big
+              value={name}
+              onChangeText={setName}
+              placeholder="Name your habit"
+              maxLength={40}
+              returnKeyType="done"
+              autoFocus={!isEdit && !template}
+            />
           </View>
-        </Card>
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          {HABIT_TINT_KEYS.map((k) => {
+            const on = color === k;
+            return (
+              <Tap
+                key={k}
+                onPress={() => setColor(k)}
+                scaleTo={0.85}
+                accessibilityLabel={`${k} colour`}
+                accessibilityState={{ selected: on }}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: on ? t.text : 'transparent',
+                }}
+              >
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: tint(k, t) }} />
+              </Tap>
+            );
+          })}
+        </View>
 
         {!isEdit ? (
-          <Section title="Start from a template">
+          <Section title="Or start from a template">
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
               style={{ marginHorizontal: -20 }}
             >
-              <View style={{ width: 12 }} />
               {TEMPLATES.map((tpl) => (
                 <Chip
                   key={tpl.id}
-                  emoji={tpl.emoji}
+                  icon={isIconName(tpl.icon) ? tpl.icon : undefined}
                   label={tpl.name}
                   selected={name === tpl.name}
-                  color={tpl.color}
+                  color={tint(tpl.color, t)}
                   onPress={() => applyTemplate(tpl)}
                 />
               ))}
-              <View style={{ width: 12 }} />
             </ScrollView>
           </Section>
         ) : null}
 
-        <TextField
-          label="Name"
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g. Read before bed"
-          maxLength={40}
-          returnKeyType="done"
-        />
-
-        <Section title="How do you measure it?">
+        <Section title="Goal">
           <Segmented<HabitKind>
             value={kind}
             onChange={(k) => {
@@ -281,16 +365,16 @@ export default function EditHabitScreen() {
               if (k === 'count' && targetNum < 2) setTarget('8');
             }}
             options={[
-              { value: 'check', label: 'Yes / No' },
-              { value: 'count', label: 'Count' },
-              { value: 'duration', label: 'Time' },
+              { value: 'check', label: 'Yes / No', icon: 'check-circle' },
+              { value: 'count', label: 'Count', icon: 'plus-circle' },
+              { value: 'duration', label: 'Time', icon: 'timer' },
             ]}
           />
           {kind !== 'check' ? (
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ flex: 1 }}>
                 <TextField
-                  label={kind === 'duration' ? 'Minutes' : 'Target'}
+                  label={kind === 'duration' ? 'Minutes a day' : 'Target'}
                   value={target}
                   onChangeText={setTarget}
                   keyboardType="numeric"
@@ -312,7 +396,7 @@ export default function EditHabitScreen() {
           ) : null}
         </Section>
 
-        <Section title="When?">
+        <Section title="Schedule">
           <Segmented<Schedule['type']>
             value={schedule.type}
             onChange={(type) =>
@@ -322,8 +406,8 @@ export default function EditHabitScreen() {
             }
             options={[
               { value: 'daily', label: 'Every day' },
-              { value: 'days', label: 'Pick days' },
-              { value: 'weekly', label: 'X per week' },
+              { value: 'days', label: 'Some days' },
+              { value: 'weekly', label: 'X a week' },
             ]}
           />
           {schedule.type === 'days' ? (
@@ -341,22 +425,17 @@ export default function EditHabitScreen() {
                     }
                     scaleTo={0.88}
                     accessibilityState={{ selected: on }}
+                    accessibilityLabel={WEEKDAY_SHORT[d]}
                     style={{
                       width: 42,
                       height: 42,
                       borderRadius: 21,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: on ? color : t.surface,
-                      borderWidth: 1,
-                      borderColor: on ? color : t.border,
+                      backgroundColor: on ? t.text : t.surface2,
                     }}
                   >
-                    <Text
-                      variant="caption"
-                      color={on ? '#FFF' : t.textMuted}
-                      style={{ fontFamily: 'Inter_600SemiBold' }}
-                    >
+                    <Text variant="caption" weight="semibold" color={on ? t.bg : t.textMuted}>
                       {WEEKDAY_SHORT[d].slice(0, 2)}
                     </Text>
                   </Tap>
@@ -369,9 +448,8 @@ export default function EditHabitScreen() {
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <Chip
                   key={n}
-                  label={`${n}×`}
+                  label={`${n}× a week`}
                   selected={schedule.times === n}
-                  color={color}
                   onPress={() => setSchedule({ type: 'weekly', times: n })}
                 />
               ))}
@@ -387,15 +465,14 @@ export default function EditHabitScreen() {
                 icon="bell"
                 label={formatTime(r)}
                 selected
-                color={color}
                 onPress={() => setReminders(reminders.filter((x) => x !== r))}
               />
             ))}
-            <Chip icon="plus" label={reminders.length ? 'Add' : 'Add reminder'} onPress={() => setTimeOpen(true)} />
+            <Chip icon="plus" label={reminders.length ? 'Add' : 'Add a reminder'} onPress={() => setTimeOpen(true)} />
           </View>
           {reminders.length ? (
             <Text variant="caption" tone="faint">
-              Tap a time to remove it. Reminders have a ✓ Done button — log without opening the app.
+              Tap a time to remove it. Reminders have a Done button, so you can log without opening the app.
             </Text>
           ) : null}
         </Section>
@@ -405,17 +482,16 @@ export default function EditHabitScreen() {
             {autoOptions.map((o) => (
               <Chip
                 key={o.value}
-                emoji={o.emoji}
+                icon={o.icon}
                 label={o.label}
                 selected={autoChoice === o.value}
-                color={t.xp}
                 onPress={() => pickAuto(o.value)}
               />
             ))}
           </View>
           {autoChoice === 'github' || autoChoice === 'leetcode' ? (
             <TextField
-              icon="at-sign"
+              icon="at"
               value={autoUser}
               onChangeText={setAutoUser}
               placeholder={autoChoice === 'github' ? 'GitHub username' : 'LeetCode username'}
@@ -427,82 +503,78 @@ export default function EditHabitScreen() {
                   : 'Days with a LeetCode submission count. Your submission calendar is imported.'
               }
             />
+          ) : autoChoice.startsWith('dev-') ? (
+            <Text variant="caption" tone="faint">
+              {autoChoice === 'dev-steps'
+                ? 'Counted by your phone’s step sensor, even with Ritual closed, offline and without GPS.'
+                : 'Detected automatically when you walk, run or ride, plus anything you record with the workout tracker. Duration habits count minutes; km habits count distance.'}
+            </Text>
           ) : autoChoice !== 'none' ? (
             <Text variant="caption" tone="faint">
               Reads{' '}
               {autoChoice === 'steps' ? 'daily steps' : autoChoice === 'sleep' ? 'sleep sessions' : 'exercise sessions'}{' '}
-              from Health Connect (Google Fit, Samsung Health, Fitbit…). Completes itself when you hit the target.
+              from Health Connect (Google Fit, Samsung Health, Fitbit…) and completes itself when you hit the target.
             </Text>
           ) : null}
         </Section>
 
-        <Section title="Color">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            {HABIT_COLORS.map((c) => (
-              <Tap
-                key={c}
-                onPress={() => setColor(c)}
-                scaleTo={0.85}
-                accessibilityLabel={`Color ${c}`}
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  backgroundColor: c,
-                  borderWidth: 3,
-                  borderColor: color === c ? t.text : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {color === c ? <Icon name="check" size={16} color="#FFF" /> : null}
-              </Tap>
-            ))}
+        <Tap
+          onPress={() => setMore(!more)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: more }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyStrong">More options</Text>
+            <Text variant="caption" tone="muted">
+              Difficulty, category and your why
+            </Text>
           </View>
-        </Section>
+          <Icon name={more ? 'caret-up' : 'caret-down'} size={16} color={t.textMuted} />
+        </Tap>
 
-        <Section title="Difficulty">
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
-              <Chip
-                key={d}
-                label={`${d[0].toUpperCase()}${d.slice(1)} · ${BASE_XP[d]} XP`}
-                selected={difficulty === d}
-                onPress={() => setDifficulty(d)}
+        {more ? (
+          <>
+            <Section title="Difficulty">
+              <Segmented<Difficulty>
+                value={difficulty}
+                onChange={setDifficulty}
+                options={(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => ({
+                  value: d,
+                  label: `${d[0].toUpperCase()}${d.slice(1)} · ${BASE_XP[d]}`,
+                }))}
               />
-            ))}
-          </View>
-        </Section>
+            </Section>
 
-        <Section title="Category">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {CATEGORIES.map((c) => (
-              <Chip
-                key={c.id}
-                emoji={c.emoji}
-                label={c.name}
-                size="sm"
-                selected={category === c.id}
-                color={c.color}
-                onPress={() => setCategory(category === c.id ? null : c.id)}
-              />
-            ))}
-          </View>
-        </Section>
+            <Section title="Category">
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {CATEGORIES.map((cat) => (
+                  <Chip
+                    key={cat.id}
+                    icon={isIconName(cat.icon) ? cat.icon : undefined}
+                    label={cat.name}
+                    size="sm"
+                    selected={category === cat.id}
+                    onPress={() => setCategory(category === cat.id ? null : cat.id)}
+                  />
+                ))}
+              </View>
+            </Section>
 
-        <TextField
-          label="Why does this matter? (optional)"
-          value={intention}
-          onChangeText={setIntention}
-          placeholder="So I have energy to play with my kids"
-          multiline
-          maxLength={200}
-          hint="Your reason shows up on the habit — it helps on hard days."
-        />
+            <TextField
+              label="Why does this matter to you?"
+              value={intention}
+              onChangeText={setIntention}
+              placeholder="So I have energy to play with my kids"
+              multiline
+              maxLength={200}
+              hint="Shown on the habit. It helps on hard days."
+            />
+          </>
+        ) : null}
 
-        <Button title={isEdit ? 'Save changes' : 'Create habit'} size="lg" full loading={saving} onPress={save} />
         {existing ? (
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
             <Button
               title={existing.archived ? 'Unarchive' : 'Archive'}
               variant="secondary"
@@ -510,16 +582,16 @@ export default function EditHabitScreen() {
               style={{ flex: 1 }}
               onPress={() => {
                 useApp.getState().archiveHabit(existing.id, !existing.archived);
-                toast(existing.archived ? 'Habit restored' : 'Archived — history kept', { emoji: '📦' });
+                toast(existing.archived ? 'Habit restored' : 'Archived. History kept', { icon: 'archive' });
                 router.dismissAll();
                 router.replace('/');
               }}
             />
-            <Button title="Delete" variant="danger" icon="trash-2" style={{ flex: 1 }} onPress={confirmDelete} />
+            <Button title="Delete" variant="danger" icon="trash" style={{ flex: 1 }} onPress={confirmDelete} />
           </View>
         ) : null}
       </Screen>
-      <EmojiSheet visible={emojiOpen} onClose={() => setEmojiOpen(false)} onPick={setEmoji} />
+      <IconSheet visible={iconOpen} onClose={() => setIconOpen(false)} onPick={setIcon} color={color} selected={icon} />
       <TimeSheet
         visible={timeOpen}
         onClose={() => setTimeOpen(false)}

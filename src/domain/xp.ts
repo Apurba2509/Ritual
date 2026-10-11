@@ -75,19 +75,18 @@ export function levelProgress(xp: number) {
 export interface Rank {
   minLevel: number;
   title: string;
-  emoji: string;
-  color: string;
+  icon: string;
 }
 
 export const RANKS: Rank[] = [
-  { minLevel: 1, title: 'Spark', emoji: '✨', color: '#A1A1AA' },
-  { minLevel: 3, title: 'Kindling', emoji: '🪵', color: '#F59E0B' },
-  { minLevel: 5, title: 'Flame', emoji: '🔥', color: '#FF6A3D' },
-  { minLevel: 8, title: 'Blaze', emoji: '☄️', color: '#F43F5E' },
-  { minLevel: 12, title: 'Inferno', emoji: '🌋', color: '#E11D48' },
-  { minLevel: 16, title: 'Phoenix', emoji: '🦅', color: '#A855F7' },
-  { minLevel: 21, title: 'Supernova', emoji: '💫', color: '#6366F1' },
-  { minLevel: 30, title: 'Eternal', emoji: '🌌', color: '#22D3EE' },
+  { minLevel: 1, title: 'Rookie', icon: 'sparkle' },
+  { minLevel: 3, title: 'Regular', icon: 'lightning' },
+  { minLevel: 5, title: 'Committed', icon: 'target' },
+  { minLevel: 8, title: 'Devoted', icon: 'fire' },
+  { minLevel: 12, title: 'Disciplined', icon: 'shield-check' },
+  { minLevel: 16, title: 'Relentless', icon: 'medal' },
+  { minLevel: 21, title: 'Master', icon: 'crown' },
+  { minLevel: 30, title: 'Legend', icon: 'infinity' },
 ];
 
 export function rankForLevel(level: number): Rank {

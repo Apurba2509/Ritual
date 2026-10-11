@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { HABIT_COLORS } from '@/domain/catalog';
+
 import { addDays, startOfWeek, todayKey } from '@/domain/dates';
 import type { HabitKind } from '@/domain/types';
 import { useSession } from '@/data/session';
 import { toast } from '@/data/ui';
 import { friendlyError } from '@/lib/errors';
 import { formatAmount } from '@/features/habits/format';
-import { EmojiSheet } from '@/features/habits/pickers';
+import { HabitIcon } from '@/features/habits/HabitIcon';
+import { IconSheet } from '@/features/habits/pickers';
 import { createChallenge, getChallenge, joinChallenge } from '@/features/social/api';
 import { CHALLENGE_TEMPLATES, ChallengeTemplate } from '@/features/social/challengeTemplates';
 import { Button } from '@/ui/Button';
@@ -20,7 +21,7 @@ import { Segmented } from '@/ui/Segmented';
 import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
-import { alpha, useTheme } from '@/ui/theme';
+import { useTheme } from '@/ui/theme';
 
 export default function NewChallengeScreen() {
   const t = useTheme();
@@ -28,8 +29,8 @@ export default function NewChallengeScreen() {
   const [tpl, setTpl] = useState<ChallengeTemplate | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [emoji, setEmoji] = useState('🏁');
-  const [color, setColor] = useState(HABIT_COLORS[0]);
+  const [icon, setIcon] = useState('flag');
+  const [color, setColor] = useState<string>('lime');
   const [kind, setKind] = useState<HabitKind>('check');
   const [target, setTarget] = useState('1');
   const [unit, setUnit] = useState('');
@@ -37,13 +38,13 @@ export default function NewChallengeScreen() {
   const [start, setStart] = useState<'today' | 'tomorrow' | 'monday'>('today');
   const [isPublic, setIsPublic] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [iconOpen, setIconOpen] = useState(false);
 
   const use = (c: ChallengeTemplate) => {
     setTpl(c);
     setTitle(c.title);
     setDescription(c.description);
-    setEmoji(c.emoji);
+    setIcon(c.icon);
     setColor(c.color);
     setKind(c.kind);
     setTarget(String(c.target));
@@ -52,7 +53,7 @@ export default function NewChallengeScreen() {
   };
 
   const create = async () => {
-    if (!user) return router.replace('/account');
+    if (!user) return router.replace('/upgrade');
     if (!title.trim()) return toast('Name your challenge', { tone: 'error' });
     setBusy(true);
     try {
@@ -63,7 +64,7 @@ export default function NewChallengeScreen() {
       const id = await createChallenge({
         title: title.trim(),
         description: description.trim(),
-        emoji,
+        icon,
         color,
         kind,
         target: targetNum,
@@ -75,7 +76,7 @@ export default function NewChallengeScreen() {
       });
       const c = await getChallenge(id);
       if (c) await joinChallenge(c);
-      toast('Challenge live — invite your friends!', { emoji: '🏁', tone: 'success' });
+      toast('Challenge is live. Invite your friends!', { icon: 'flag', tone: 'success' });
       router.replace(`/challenge/${id}`);
     } catch (e) {
       toast(friendlyError(e, 'Could not create challenge'), { tone: 'error' });
@@ -85,7 +86,11 @@ export default function NewChallengeScreen() {
 
   return (
     <>
-      <Screen back="close" title="New challenge">
+      <Screen
+        back="close"
+        title="New challenge"
+        footer={<Button title="Create & join" icon="flag" size="lg" full loading={busy} onPress={create} />}
+      >
         <Section title="Templates">
           <View style={{ gap: 8 }}>
             {CHALLENGE_TEMPLATES.map((c) => (
@@ -97,11 +102,11 @@ export default function NewChallengeScreen() {
                   alignItems: 'center',
                   gap: 12,
                   padding: 12,
-                  borderColor: tpl?.id === c.id ? c.color : t.border,
-                  backgroundColor: tpl?.id === c.id ? alpha(c.color, 0.08) : t.surface,
+                  borderWidth: tpl?.id === c.id ? 2 : 1,
+                  borderColor: tpl?.id === c.id ? (t.scheme === 'dark' ? t.accent : t.text) : t.border,
                 }}
               >
-                <Text size={24}>{c.emoji}</Text>
+                <HabitIcon icon={c.icon} color={c.color} size={40} />
                 <View style={{ flex: 1 }}>
                   <Text variant="bodyStrong">{c.title}</Text>
                   <Text variant="caption" tone="muted">
@@ -114,20 +119,8 @@ export default function NewChallengeScreen() {
         </Section>
 
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
-          <Tap
-            onPress={() => setEmojiOpen(true)}
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: 16,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: alpha(color, 0.18),
-              borderWidth: 1,
-              borderColor: alpha(color, 0.4),
-            }}
-          >
-            <Text size={26}>{emoji}</Text>
+          <Tap onPress={() => setIconOpen(true)} scaleTo={0.9} accessibilityLabel="Change icon">
+            <HabitIcon icon={icon} color={color} size={62} />
           </Tap>
           <View style={{ flex: 1 }}>
             <TextField
@@ -180,7 +173,7 @@ export default function NewChallengeScreen() {
         <Section title="Length">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {[7, 14, 21, 30, 66, 75, 100].map((d) => (
-              <Chip key={d} label={`${d} days`} selected={days === d} color={color} onPress={() => setDays(d)} />
+              <Chip key={d} label={`${d} days`} selected={days === d} onPress={() => setDays(d)} />
             ))}
           </View>
         </Section>
@@ -199,7 +192,7 @@ export default function NewChallengeScreen() {
 
         <ListGroup>
           <ListRow
-            icon="globe"
+            icon="globe-simple"
             title="Public"
             subtitle="Anyone can find and join. Off = invite link only."
             toggle={isPublic}
@@ -207,10 +200,8 @@ export default function NewChallengeScreen() {
             last
           />
         </ListGroup>
-
-        <Button title="Create & join" icon="flag" size="lg" full loading={busy} onPress={create} />
       </Screen>
-      <EmojiSheet visible={emojiOpen} onClose={() => setEmojiOpen(false)} onPick={setEmoji} />
+      <IconSheet visible={iconOpen} onClose={() => setIconOpen(false)} onPick={setIcon} color={color} selected={icon} />
     </>
   );
 }

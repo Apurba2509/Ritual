@@ -1,0 +1,75 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="expo.modules.ritualsensing" >
+4
+5    <uses-sdk android:minSdkVersion="26" />
+6    <!-- Step counter + activity detection (walk / run / ride), no GPS or network needed -->
+7    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+7-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:3:3-77
+7-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:3:20-74
+8    <!-- Workout recorder: GPS route while a session runs in a foreground service -->
+9    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+9-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:5:3-77
+9-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:5:20-74
+10    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+10-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:6:3-79
+10-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:6:20-76
+11    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+11-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:7:3-75
+11-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:7:20-72
+12    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+12-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:8:3-84
+12-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:8:20-81
+13    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+13-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:9:3-82
+13-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:9:20-79
+14    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+14-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:10:3-79
+14-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:10:20-76
+15    <uses-permission android:name="android.permission.WAKE_LOCK" />
+15-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:11:3-66
+15-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:11:20-63
+16    <!-- Android 16 Live Updates: lets the workout notification become a status-bar chip -->
+17    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+17-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:13:3-84
+17-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:13:20-81
+18
+19    <application>
+19-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:15:3-30:17
+20        <service
+20-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:16:5-19:57
+21            android:name="expo.modules.ritualsensing.WorkoutService"
+21-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:17:7-37
+22            android:exported="false"
+22-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:18:7-31
+23            android:foregroundServiceType="location|health" />
+23-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:19:7-54
+24
+25        <receiver
+25-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:21:5-77
+26            android:name="expo.modules.ritualsensing.TransitionReceiver"
+26-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:21:15-49
+27            android:exported="false" />
+27-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:21:50-74
+28        <receiver
+28-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:23:5-29:16
+29            android:name="expo.modules.ritualsensing.BootReceiver"
+29-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:23:15-43
+30            android:exported="true" >
+30-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:23:44-67
+31            <intent-filter>
+31-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:24:7-28:23
+32                <action android:name="android.intent.action.BOOT_COMPLETED" />
+32-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:25:9-71
+32-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:25:17-68
+33                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+33-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:26:9-76
+33-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:26:17-73
+34                <action android:name="android.intent.action.ACTION_SHUTDOWN" />
+34-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:27:9-72
+34-->C:\Ritual Revamped\Ritual\modules\ritual-sensing\android\src\main\AndroidManifest.xml:27:17-69
+35            </intent-filter>
+36        </receiver>
+37    </application>
+38
+39</manifest>

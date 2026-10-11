@@ -1,17 +1,16 @@
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { sendEmailVerification } from 'firebase/auth';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { HABIT_COLORS } from '@/domain/catalog';
+import { ActivityIndicator, View } from 'react-native';
 import { authErrorMessage, claimUsername, deleteAccount, normalizeUsername, USERNAME_RE } from '@/data/auth';
 import { useSession } from '@/data/session';
 import { useApp } from '@/data/store';
+import { sync } from '@/data/sync';
 import { toast } from '@/data/ui';
-import { AuthForm } from '@/features/auth/AuthForm';
-import { EmojiSheet } from '@/features/habits/pickers';
+import { GoogleG } from '@/features/auth/GoogleButton';
 import { pickAndUpload } from '@/features/habits/photo';
 import { cloudinaryConfigured } from '@/lib/cloudinary';
-import { firebase, isFirebaseConfigured } from '@/lib/firebase';
+import { firebase } from '@/lib/firebase';
 import { Avatar } from '@/ui/Avatar';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -22,25 +21,6 @@ import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
 import { useTheme } from '@/ui/theme';
-
-function GuestUpgrade() {
-  const t = useTheme();
-  const [mode, setMode] = useState<'signUp' | 'signIn'>('signUp');
-  const habits = useApp((s) => Object.values(s.habits).filter((h) => !h.deleted).length);
-  return (
-    <Screen back title={mode === 'signUp' ? 'Create your account' : 'Welcome back'}>
-      <Card tone="raised" style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-        <Icon name="cloud" size={22} color={t.success} />
-        <Text variant="caption" tone="muted" style={{ flex: 1 }}>
-          {mode === 'signUp'
-            ? `Your ${habits} habit${habits === 1 ? '' : 's'} and full history move to your new account — backed up, synced across devices, ready for friends and challenges.`
-            : 'Anything you tracked as a guest is merged into your account when you sign in.'}
-        </Text>
-      </Card>
-      <AuthForm mode={mode} onSwitch={() => setMode(mode === 'signUp' ? 'signIn' : 'signUp')} />
-    </Screen>
-  );
-}
 
 export default function AccountScreen() {
   const t = useTheme();
@@ -53,29 +33,40 @@ export default function AccountScreen() {
   useEffect(() => setName(profile.displayName), [profile.displayName]);
   useEffect(() => setUsername(profile.username ?? ''), [profile.username]);
   useEffect(() => setBio(profile.bio ?? ''), [profile.bio]);
-  const [emojiOpen, setEmojiOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const params = useLocalSearchParams<{ delete?: string }>();
+  const [deleteOpen, setDeleteOpen] = useState(params.delete === '1');
   const [password, setPassword] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  if (!user) {
-    if (!isFirebaseConfigured) {
-      return (
-        <Screen back title="Account">
-          <Card>
-            <Text tone="muted">
-              Cloud accounts aren’t configured in this build. Your data is stored safely on this device.
-            </Text>
-          </Card>
-        </Screen>
-      );
-    }
-    return <GuestUpgrade />;
-  }
+  if (!user) return <Redirect href="/upgrade" />;
 
+  const google = user.provider === 'google';
   const handle = normalizeUsername(username);
+  const dirty =
+    name.trim() !== profile.displayName || handle !== (profile.username ?? '') || (bio.trim() || null) !== profile.bio;
+
+  const setPhoto = (photoUrl: string | null) => {
+    useApp.getState().updateProfile({ avatar: { ...useApp.getState().profile.avatar, photoUrl } });
+    sync.schedulePublish();
+  };
+
+  const changePhoto = async () => {
+    setUploading(true);
+    try {
+      const url = await pickAndUpload('avatars', true);
+      if (url) {
+        setPhoto(url);
+        toast('Profile photo updated', { icon: 'camera', tone: 'success' });
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Upload failed', { tone: 'error' });
+    }
+    setUploading(false);
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -84,7 +75,8 @@ export default function AccountScreen() {
         if (!USERNAME_RE.test(handle)) throw new Error('Usernames are 3–20 characters: letters, numbers, _ or .');
         await claimUsername(handle);
       }
-      toast('Profile saved', { emoji: '✨', tone: 'success' });
+      sync.schedulePublish();
+      toast('Profile saved', { tone: 'success' });
       router.back();
     } catch (e) {
       toast(authErrorMessage(e), { tone: 'error' });
@@ -94,89 +86,73 @@ export default function AccountScreen() {
 
   return (
     <>
-      <Screen back title="Profile">
-        <View style={{ alignItems: 'center', gap: 12 }}>
-          <Tap onPress={() => setEmojiOpen(true)} scaleTo={0.92} accessibilityLabel="Change avatar">
-            <Avatar
-              emoji={profile.avatar.emoji}
-              color={profile.avatar.color}
-              photoUrl={profile.avatar.photoUrl}
-              size={96}
-            />
-            <View
-              style={{
-                position: 'absolute',
-                right: 0,
-                bottom: 0,
-                width: 30,
-                height: 30,
-                borderRadius: 15,
-                backgroundColor: t.accent,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 2,
-                borderColor: t.bg,
-              }}
-            >
-              <Icon name="edit-2" size={13} color="#FFF" />
-            </View>
-          </Tap>
-          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {HABIT_COLORS.map((c) => (
-              <Tap
-                key={c}
-                onPress={() => useApp.getState().updateProfile({ avatar: { ...profile.avatar, color: c } })}
-                scaleTo={0.85}
-                accessibilityLabel={`Avatar color ${c}`}
+      <Screen
+        back
+        title="Profile"
+        footer={<Button title="Save changes" size="lg" full loading={saving} disabled={!dirty} onPress={save} />}
+      >
+        <View style={{ alignItems: 'center', gap: 14 }}>
+          <Tap
+            onPress={cloudinaryConfigured ? changePhoto : undefined}
+            disabled={!cloudinaryConfigured || uploading}
+            scaleTo={0.94}
+            accessibilityLabel="Change profile photo"
+          >
+            <Avatar photoUrl={profile.avatar.photoUrl} name={name || profile.displayName} seed={user.uid} size={104} />
+            {uploading ? (
+              <View
                 style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: 13,
-                  backgroundColor: c,
-                  borderWidth: 2,
-                  borderColor: profile.avatar.color === c ? t.text : 'transparent',
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: 52,
+                  backgroundColor: 'rgba(0,0,0,0.45)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
-              />
-            ))}
-          </View>
-          {cloudinaryConfigured ? (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Button
-                title={profile.avatar.photoUrl ? 'Change photo' : 'Use a photo'}
-                size="sm"
-                variant="secondary"
-                icon="camera"
-                onPress={async () => {
-                  try {
-                    const url = await pickAndUpload('avatars', true);
-                    if (url) useApp.getState().updateProfile({ avatar: { ...profile.avatar, photoUrl: url } });
-                  } catch (e) {
-                    toast(e instanceof Error ? e.message : 'Upload failed', { tone: 'error' });
-                  }
+              >
+                <ActivityIndicator color="#FFFFFF" />
+              </View>
+            ) : null}
+            {cloudinaryConfigured ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  bottom: 0,
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  backgroundColor: t.accent,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 3,
+                  borderColor: t.bg,
                 }}
-              />
-              {profile.avatar.photoUrl ? (
-                <Button
-                  title="Use emoji"
-                  size="sm"
-                  variant="ghost"
-                  onPress={() => useApp.getState().updateProfile({ avatar: { ...profile.avatar, photoUrl: null } })}
-                />
-              ) : null}
-            </View>
+              >
+                <Icon name="camera" size={15} color={t.onAccent} weight="fill" />
+              </View>
+            ) : null}
+          </Tap>
+          {profile.avatar.photoUrl ? (
+            <Button title="Remove photo" size="sm" variant="ghost" onPress={() => setPhoto(null)} />
+          ) : cloudinaryConfigured ? (
+            <Text variant="caption" tone="muted">
+              Tap to add a photo
+            </Text>
           ) : null}
         </View>
 
-        <TextField label="Display name" value={name} onChangeText={setName} maxLength={40} icon="smile" />
+        <TextField label="Name" value={name} onChangeText={setName} maxLength={40} icon="user" />
         <TextField
           label="Username"
           value={username}
           onChangeText={(v) => setUsername(v.toLowerCase().replace(/\s/g, ''))}
           autoCapitalize="none"
           autoCorrect={false}
-          icon="at-sign"
+          icon="at"
           maxLength={20}
           error={username && !USERNAME_RE.test(handle) ? '3–20 characters: letters, numbers, _ or .' : null}
+          hint="Friends find you with this."
         />
         <TextField
           label="Bio"
@@ -186,18 +162,35 @@ export default function AccountScreen() {
           multiline
           maxLength={140}
         />
-        <Button title="Save profile" size="lg" full loading={saving} onPress={save} />
 
-        <Section title="Account">
-          <Card style={{ gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Icon name="mail" size={18} color={t.textMuted} />
-              <Text style={{ flex: 1 }}>{user.email}</Text>
-              <Text variant="caption" tone={user.emailVerified ? 'success' : 'muted'}>
-                {user.emailVerified ? 'Verified' : 'Unverified'}
-              </Text>
+        <Section title="Sign-in">
+          <Card style={{ gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 12,
+                  backgroundColor: google ? '#FFFFFF' : t.surface2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {google ? <GoogleG size={18} /> : <Icon name="envelope-simple" size={18} color={t.text} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyStrong">{google ? 'Google' : 'Email & password'}</Text>
+                <Text variant="caption" tone="muted" numberOfLines={1}>
+                  {user.email}
+                </Text>
+              </View>
+              {!google ? (
+                <Text variant="caption" weight="semibold" tone={user.emailVerified ? 'accent' : 'muted'}>
+                  {user.emailVerified ? 'Verified' : 'Unverified'}
+                </Text>
+              ) : null}
             </View>
-            {!user.emailVerified ? (
+            {!google && !user.emailVerified ? (
               <Button
                 title="Resend verification email"
                 size="sm"
@@ -206,20 +199,21 @@ export default function AccountScreen() {
                   const u = firebase()?.auth.currentUser;
                   if (u) {
                     await sendEmailVerification(u).catch(() => {});
-                    toast('Verification email sent', { emoji: '📬' });
+                    toast('Verification email sent', { icon: 'paper-plane-tilt' });
                   }
                 }}
               />
             ) : null}
           </Card>
-          <Button title="Delete account" variant="danger" icon="alert-triangle" onPress={() => setDeleteOpen(true)} />
+        </Section>
+
+        <Section title="Danger zone">
+          <Button title="Delete account" variant="danger" icon="trash" full onPress={() => setDeleteOpen(true)} />
+          <Text variant="caption" tone="faint">
+            Erases your profile, habits, history, workouts, friends and badges from Ritual’s servers and this device.
+          </Text>
         </Section>
       </Screen>
-      <EmojiSheet
-        visible={emojiOpen}
-        onClose={() => setEmojiOpen(false)}
-        onPick={(emoji) => useApp.getState().updateProfile({ avatar: { ...profile.avatar, emoji } })}
-      />
       <Sheet
         visible={deleteOpen}
         onClose={() => setDeleteOpen(false)}
@@ -227,19 +221,19 @@ export default function AccountScreen() {
         subtitle="Every habit, check-in, friend and badge is permanently erased. This can’t be undone."
         footer={
           <Button
-            title="Delete forever"
+            title={google ? 'Confirm with Google & delete' : 'Delete forever'}
             variant="danger"
             full
             size="lg"
             loading={deleting}
-            disabled={!password}
+            disabled={!google && !password}
             onPress={async () => {
               setDeleting(true);
               setDeleteError(null);
               try {
-                await deleteAccount(password);
+                await deleteAccount(google ? undefined : password);
                 setDeleteOpen(false);
-                toast('Account deleted', { emoji: '👋' });
+                toast('Account deleted', { icon: 'hand-waving' });
               } catch (e) {
                 setDeleteError(authErrorMessage(e));
               }
@@ -248,14 +242,23 @@ export default function AccountScreen() {
           />
         }
       >
-        <TextField
-          label="Confirm with your password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          error={deleteError}
-        />
+        {google ? (
+          <Text tone="muted">You’ll be asked to pick your Google account once more to confirm it’s you.</Text>
+        ) : (
+          <TextField
+            label="Confirm with your password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            icon="lock-simple"
+          />
+        )}
+        {deleteError ? (
+          <Text variant="caption" tone="danger">
+            {deleteError}
+          </Text>
+        ) : null}
       </Sheet>
     </>
   );

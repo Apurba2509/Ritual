@@ -2,7 +2,7 @@ rules_version = '2';
 
 // Ritual — Firestore security rules
 // ────────────────────────────────
-// • users/{uid}/**          private: only the owner can read/write (habits, entries, inbox reads)
+// • users/{uid}/**          private: only the owner can read/write (habits, entries, workouts, inbox reads)
 // • profiles/{uid}          public to signed-in users, writable only by the owner (validated shape)
 // • usernames/{name}        one-claim-per-name registry (anyone can check availability)
 // • friendships/{a_b}       both members can read; requester creates "pending", addressee accepts
@@ -48,6 +48,19 @@ service cloud.firestore {
           && request.resource.data.value is number
           && request.resource.data.value >= 0
           && request.resource.data.updatedAt is number;
+      }
+
+      match /workouts/{workoutId} {
+        allow read, delete: if isUser(uid);
+        allow create, update: if isUser(uid)
+          && request.resource.data.id == workoutId
+          && request.resource.data.type in ['walk', 'run', 'ride']
+          && request.resource.data.distanceM is number
+          && request.resource.data.distanceM >= 0
+          && request.resource.data.movingSec is number
+          && request.resource.data.updatedAt is number
+          && (!('route' in request.resource.data) || request.resource.data.route == null
+              || (request.resource.data.route is string && request.resource.data.route.size() < 60000));
       }
 
       match /inbox/{itemId} {

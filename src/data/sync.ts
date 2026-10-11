@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { create } from 'zustand';
 import { weekId } from '@/domain/dates';
-import type { Entry, Habit } from '@/domain/types';
+import type { Entry, Habit, Workout } from '@/domain/types';
 import { firebase } from '@/lib/firebase';
 import { getSnapshot, useClock } from './hooks';
 import { OutboxOp, RemoteUserDoc, useApp } from './store';
@@ -72,9 +72,9 @@ class SyncEngine {
     const { db } = fb;
     const app = useApp.getState();
 
-    const listen = (kind: 'habit' | 'entry') => {
-      const name = kind === 'habit' ? 'habits' : 'entries';
-      const cursor = app.cursors[name];
+    const listen = (kind: 'habit' | 'entry' | 'workout') => {
+      const name = kind === 'habit' ? 'habits' : kind === 'entry' ? 'entries' : 'workouts';
+      const cursor = app.cursors[name] ?? 0;
       const q = query(
         collection(db, 'users', uid, name),
         where('serverUpdatedAt', '>', Timestamp.fromMillis(cursor)),
@@ -83,8 +83,8 @@ class SyncEngine {
       return onSnapshot(
         q,
         (snap) => {
-          const docs: (Habit | Entry)[] = [];
-          let max = useApp.getState().cursors[name];
+          const docs: (Habit | Entry | Workout)[] = [];
+          let max = useApp.getState().cursors[name] ?? 0;
           for (const change of snap.docChanges()) {
             if (change.type === 'removed' || change.doc.metadata.hasPendingWrites) continue;
             const data = change.doc.data();
@@ -98,7 +98,7 @@ class SyncEngine {
       );
     };
 
-    this.unsubs.push(listen('habit'), listen('entry'));
+    this.unsubs.push(listen('habit'), listen('entry'), listen('workout'));
     this.unsubs.push(
       onSnapshot(
         doc(db, 'users', uid),
@@ -171,6 +171,9 @@ class SyncEngine {
           } else if (op.kind === 'entry') {
             const e = s.entries[op.id];
             if (e) batch.set(doc(fb.db, 'users', uid, 'entries', e.id), { ...e, serverUpdatedAt: serverTimestamp() });
+          } else if (op.kind === 'workout') {
+            const w = s.workouts[op.id];
+            if (w) batch.set(doc(fb.db, 'users', uid, 'workouts', w.id), { ...w, serverUpdatedAt: serverTimestamp() });
           } else {
             const { theme: _theme, ...settings } = s.settings;
             const userDoc: RemoteUserDoc & { serverUpdatedAt: unknown } = {

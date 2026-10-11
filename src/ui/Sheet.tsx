@@ -4,6 +4,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
+import { FRAME_WIDTH } from './layout';
 import { Text } from './Text';
 import { radius, useTheme } from './theme';
 
@@ -80,6 +81,9 @@ export function Sheet({ visible, onClose, title, subtitle, children, scroll = tr
             style={[
               {
                 maxHeight: '92%',
+                width: '100%',
+                maxWidth: Platform.OS === 'web' ? FRAME_WIDTH : undefined,
+                alignSelf: 'center',
                 backgroundColor: t.bgElevated,
                 borderTopLeftRadius: radius.xl,
                 borderTopRightRadius: radius.xl,

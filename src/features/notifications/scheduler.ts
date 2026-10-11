@@ -1,26 +1,37 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { addDays, fromDayKey, todayKey } from '@/domain/dates';
-import { isDueOn, isEntryDone, targetLabel } from '@/domain/habits';
+import { todayKey } from '@/domain/dates';
+import { isEntryDone, targetLabel } from '@/domain/habits';
+import { PlannedKind, planNotifications } from '@/domain/notifications';
 import type { Habit } from '@/domain/types';
 import { getSnapshot } from '@/data/hooks';
 import { useApp } from '@/data/store';
+import { useSensing } from '@/features/sensing';
 
 /**
- * Reminders are scheduled as one-off DATE notifications for the next few days, rebuilt
- * whenever habits or entries change. That makes them *smart*: a reminder for a habit
- * you've already finished today simply isn't there, and the evening nudge knows how
- * many habits are left and how long your streak is.
+ * Local notifications, planned by domain/notifications and rebuilt whenever habits, entries or
+ * settings change. Everything is a one-off DATE notification for the next few days, so nothing
+ * stale fires: finish a habit and its nudges are gone.
  */
 
-export const CATEGORY_HABIT = 'habit-reminder';
+export const CATEGORY_HABIT = 'habitreminder';
 export const ACTION_DONE = 'done';
 export const ACTION_SNOOZE = 'snooze';
-const CHANNEL = 'reminders';
-const PREFIXES = ['habit:', 'brief:', 'evening:'];
-const MAX_PENDING = 56; // iOS caps pending local notifications at 64
+
+const CHANNELS = {
+  reminders: 'reminders',
+  coach: 'coach',
+  auto: 'autotracking',
+} as const;
+
+const OWNED_PREFIXES = ['habit:', 'nudge:', 'brief:', 'midday:', 'move:', 'evening:', 'lastcall:', 'weekly:'];
+// Android allows ~500 pending alarms per app; iOS caps at 64. Stay well under both.
+const MAX_PENDING = 60;
 
 const supported = Platform.OS !== 'web';
+
+const channelFor = (kind: PlannedKind) =>
+  kind === 'reminder' || kind === 'lastcall' ? CHANNELS.reminders : CHANNELS.coach;
 
 export async function setupNotifications() {
   if (!supported) return;
@@ -33,15 +44,29 @@ export async function setupNotifications() {
     }),
   });
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(CHANNEL, {
+    await Notifications.setNotificationChannelAsync(CHANNELS.reminders, {
       name: 'Habit reminders',
+      description: 'The times you set for your habits, and streak-saving last calls',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 180, 120, 180],
-      lightColor: '#FF6A3D',
+      lightColor: '#D4FF3F',
+    });
+    await Notifications.setNotificationChannelAsync(CHANNELS.coach, {
+      name: 'Coaching',
+      description: 'Morning brief, check-ins, movement nudges and weekly recap',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 120],
+      lightColor: '#D4FF3F',
+    });
+    await Notifications.setNotificationChannelAsync(CHANNELS.auto, {
+      name: 'Auto-tracking',
+      description: 'When a habit completes itself from your phone, GitHub or LeetCode',
+      importance: Notifications.AndroidImportance.LOW,
+      lightColor: '#D4FF3F',
     });
   }
   await Notifications.setNotificationCategoryAsync(CATEGORY_HABIT, [
-    { identifier: ACTION_DONE, buttonTitle: '✓ Done', options: { opensAppToForeground: true } },
+    { identifier: ACTION_DONE, buttonTitle: 'Done', options: { opensAppToForeground: true } },
     { identifier: ACTION_SNOOZE, buttonTitle: 'Snooze 1h', options: { opensAppToForeground: true } },
   ]);
 }
@@ -66,38 +91,8 @@ export async function cancelAllReminders() {
   const pending = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     pending
-      .filter((n) => PREFIXES.some((p) => n.identifier.startsWith(p)))
+      .filter((n) => OWNED_PREFIXES.some((p) => n.identifier.startsWith(p)))
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
-  );
-}
-
-function at(day: string, hhmm: string): Date {
-  const [h, m] = hhmm.split(':').map(Number);
-  const d = fromDayKey(day);
-  d.setHours(h, m, 0, 0);
-  return d;
-}
-
-const pickLine = (lines: string[], seed: number) => lines[seed % lines.length];
-
-function reminderBody(habit: Habit, streak: number, seed: number) {
-  if (streak >= 3) {
-    return pickLine(
-      [
-        `Day ${streak + 1} is waiting. Keep the chain going 🔗`,
-        `${streak}-day streak on the line — two minutes is enough to keep it.`,
-        `You've shown up ${streak} times in a row. Make it ${streak + 1}.`,
-      ],
-      seed,
-    );
-  }
-  return pickLine(
-    [
-      `Target: ${targetLabel(habit)}. Tap ✓ Done when it's finished.`,
-      `Small reps, big results. Time for ${habit.name.toLowerCase()}.`,
-      `Future you will thank you. ${targetLabel(habit)} today.`,
-    ],
-    seed,
   );
 }
 
@@ -120,90 +115,53 @@ export async function rescheduleAll() {
   const app = useApp.getState();
   const today = todayKey();
   const snap = getSnapshot(today);
-  const now = Date.now();
-  const habits = Object.values(app.habits).filter((h) => !h.deleted && !h.archived);
-  const queue: Notifications.NotificationRequestInput[] = [];
-  const reminderCount = habits.reduce((n, h) => n + h.reminders.length, 0);
-  const horizon = Math.max(1, Math.min(7, Math.floor((MAX_PENDING - 14) / Math.max(1, reminderCount))));
+  const streaks = new Map(
+    [...snap.habitStats.entries()].map(([id, s]) => [id, { current: s.streak.current, atRisk: s.streak.atRisk }]),
+  );
+  const { settings } = app;
+  const plan = planNotifications({
+    habits: Object.values(app.habits),
+    index: snap.index,
+    streaks,
+    today,
+    now: Date.now(),
+    weekStart: settings.weekStart,
+    style: settings.notifyStyle ?? 'coach',
+    morningBrief: settings.morningBrief,
+    eveningNudge: settings.eveningNudge,
+    quietHours: settings.quietHours?.enabled ? settings.quietHours : null,
+    stepsToday: useSensing.getState().stepsToday,
+  });
 
-  for (let i = 0; i < 7; i++) {
-    const day = addDays(today, i);
-    const dueHabits = habits.filter((h) => isDueOn(h, snap.index.get(h.id), day, app.settings.weekStart));
-
-    // Per-habit reminders
-    if (i < horizon) {
-      for (const h of dueHabits) {
-        const done = isEntryDone(h, snap.index.get(h.id)?.get(day));
-        if (done) continue;
-        const streak = snap.habitStats.get(h.id)?.streak.current ?? 0;
-        for (const time of h.reminders) {
-          const when = at(day, time);
-          if (when.getTime() <= now + 30_000) continue;
-          queue.push({
-            identifier: `habit:${h.id}:${day}:${time}`,
-            content: {
-              title: `${h.emoji} ${h.name}`,
-              body: reminderBody(h, streak, when.getDate() + h.name.length),
-              categoryIdentifier: CATEGORY_HABIT,
-              data: { type: 'habit', habitId: h.id, day },
-              sound: true,
-            },
-            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: CHANNEL },
-          });
-        }
-      }
-    }
-
-    // Morning brief
-    if (app.settings.morningBrief.enabled && dueHabits.length) {
-      const when = at(day, app.settings.morningBrief.time);
-      if (when.getTime() > now + 30_000) {
-        const best = snap.bestStreak.days;
-        queue.push({
-          identifier: `brief:${day}`,
-          content: {
-            title: i === 0 ? 'Your ritual for today ☀️' : 'Good morning ☀️',
-            body: `${dueHabits.length} habit${dueHabits.length > 1 ? 's' : ''} lined up${best >= 2 ? ` · best streak ${best} days 🔥` : ''}. ${dueHabits
-              .slice(0, 3)
-              .map((h) => h.emoji)
-              .join(' ')}`,
-            data: { type: 'brief' },
-          },
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: CHANNEL },
-        });
-      }
-    }
-
-    // Evening nudge — only when something is still open.
-    if (app.settings.eveningNudge.enabled && dueHabits.length) {
-      const when = at(day, app.settings.eveningNudge.time);
-      const open = i === 0 ? dueHabits.filter((h) => !isEntryDone(h, snap.index.get(h.id)?.get(day))) : dueHabits;
-      if (when.getTime() > now + 30_000 && open.length) {
-        const atRisk = i === 0 ? open.filter((h) => snap.habitStats.get(h.id)?.streak.atRisk) : [];
-        const longest = atRisk.reduce((m, h) => Math.max(m, snap.habitStats.get(h.id)?.streak.current ?? 0), 0);
-        queue.push({
-          identifier: `evening:${day}`,
-          content: {
-            title: longest >= 2 ? `🔥 ${longest}-day streak at risk` : 'Still time today',
-            body:
-              i === 0
-                ? `${open.length} left: ${open
-                    .slice(0, 3)
-                    .map((h) => `${h.emoji} ${h.name}`)
-                    .join(', ')}${open.length > 3 ? '…' : ''}`
-                : 'Check in before the day ends to keep your streaks alive.',
-            data: { type: 'evening' },
-          },
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: CHANNEL },
-        });
-      }
-    }
+  for (const n of plan.slice(0, MAX_PENDING)) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: n.id,
+      content: {
+        title: n.title,
+        body: n.body,
+        sound: true,
+        // Habit-specific pings get Done / Snooze buttons right in the notification.
+        ...(n.habitId ? { categoryIdentifier: CATEGORY_HABIT } : {}),
+        data: { type: n.kind, habitId: n.habitId, day: n.day },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: n.at, channelId: channelFor(n.kind) },
+    });
   }
+}
 
-  queue.sort((a, b) => +(a.trigger as { date: Date }).date - +(b.trigger as { date: Date }).date);
-  for (const req of queue.slice(0, MAX_PENDING)) {
-    await Notifications.scheduleNotificationAsync(req);
-  }
+/** A habit just completed itself (sensors, GitHub, LeetCode) — say so if the app isn't open. */
+export async function notifyAutoComplete(habit: Habit, detail: string) {
+  if (!supported || !useApp.getState().settings.autoAlerts) return;
+  if ((await notificationPermission()) !== 'granted') return;
+  await Notifications.scheduleNotificationAsync({
+    identifier: `auto:${habit.id}:${todayKey()}`,
+    content: {
+      title: `${habit.name} · done`,
+      body: detail,
+      data: { type: 'auto', habitId: habit.id },
+    },
+    trigger: { channelId: CHANNELS.auto },
+  });
 }
 
 /** Demo/QA helper: fire a real habit reminder (with action buttons) in a few seconds. */
@@ -215,16 +173,19 @@ export async function sendTestReminder(): Promise<string | null> {
   const habits = Object.values(app.habits).filter((h) => !h.deleted && !h.archived);
   const habit = habits.find((h) => !isEntryDone(h, snap.index.get(h.id)?.get(today))) ?? habits[0];
   if (!habit) return null;
-  const streak = snap.habitStats.get(habit.id)?.streak.current ?? 0;
   await Notifications.scheduleNotificationAsync({
     identifier: `test:${Date.now()}`,
     content: {
-      title: `${habit.emoji} ${habit.name}`,
-      body: reminderBody(habit, streak, Date.now()),
+      title: habit.name,
+      body: `${targetLabel(habit)} today. Tap Done when it's finished.`,
       categoryIdentifier: CATEGORY_HABIT,
-      data: { type: 'habit', habitId: habit.id, day: today },
+      data: { type: 'reminder', habitId: habit.id, day: today },
     },
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 5, channelId: CHANNEL },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 5,
+      channelId: CHANNELS.reminders,
+    },
   });
   return habit.name;
 }
@@ -236,15 +197,15 @@ export async function snoozeHabit(habitId: string, minutes = 60) {
   await Notifications.scheduleNotificationAsync({
     identifier: `snooze:${habitId}:${Date.now()}`,
     content: {
-      title: `${h.emoji} ${h.name}`,
-      body: 'Snoozed reminder — ready now?',
+      title: h.name,
+      body: 'Snoozed reminder. Ready now?',
       categoryIdentifier: CATEGORY_HABIT,
-      data: { type: 'habit', habitId, day: todayKey() },
+      data: { type: 'reminder', habitId, day: todayKey() },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: minutes * 60,
-      channelId: CHANNEL,
+      channelId: CHANNELS.reminders,
     },
   });
 }
@@ -255,7 +216,7 @@ export async function scheduleAt(identifier: string, date: Date, title: string, 
   await Notifications.scheduleNotificationAsync({
     identifier,
     content: { title, body, sound: true, data: { type: 'focus' } },
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date, channelId: CHANNEL },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date, channelId: CHANNELS.reminders },
   });
 }
 

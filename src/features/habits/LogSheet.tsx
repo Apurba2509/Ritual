@@ -15,7 +15,7 @@ import { Sheet } from '@/ui/Sheet';
 import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
-import { alpha, radius, useTheme } from '@/ui/theme';
+import { radius, useTheme } from '@/ui/theme';
 import { setProgress, skipHabit } from './actions';
 import { formatAmount, MOODS, stepFor } from './format';
 import { HabitIcon } from './HabitIcon';
@@ -39,12 +39,10 @@ function Stepper({
       scaleTo={0.9}
       accessibilityLabel={name === 'plus' ? 'Increase' : 'Decrease'}
       style={{
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         backgroundColor: t.surface2,
-        borderWidth: 1,
-        borderColor: t.border,
         alignItems: 'center',
         justifyContent: 'center',
       }}
@@ -56,7 +54,9 @@ function Stepper({
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
       {btn('minus', -step)}
       <View style={{ alignItems: 'center' }}>
-        <Text variant="hero">{label}</Text>
+        <Text weight="heavy" size={40} tabular style={{ letterSpacing: -1.6 }}>
+          {label}
+        </Text>
       </View>
       {btn('plus', step)}
     </View>
@@ -115,7 +115,7 @@ export function LogSheet({ habit, day, onClose }: { habit: Habit | null; day: Da
       footer={<Button title="Save" onPress={save} full size="lg" />}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <HabitIcon emoji={habit.emoji} color={habit.color} size={40} filled={doneNow} />
+        <HabitIcon icon={habit.icon} color={habit.color} size={40} />
         <Text tone="muted" style={{ flex: 1 }}>
           Target {formatAmount(habit, habit.target)}
           {habit.kind === 'check' ? '' : ` · logged ${formatAmount(habit, value)}`}
@@ -125,7 +125,8 @@ export function LogSheet({ habit, day, onClose }: { habit: Habit | null; day: Da
       {habit.kind === 'check' ? (
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Button
-            title={doneNow ? 'Done ✓' : 'Mark done'}
+            title={doneNow ? 'Done' : 'Mark done'}
+            icon={doneNow ? 'check-circle' : 'check'}
             variant={doneNow ? 'primary' : 'secondary'}
             onPress={() => setValue(doneNow ? 0 : habit.target)}
             style={{ flex: 1 }}
@@ -140,7 +141,7 @@ export function LogSheet({ habit, day, onClose }: { habit: Habit | null; day: Da
             ))}
             <Chip
               label="Hit target"
-              color={habit.color}
+              icon="target"
               selected
               onPress={() => setValue(Math.max(value, habit.target))}
               size="sm"
@@ -174,18 +175,23 @@ export function LogSheet({ habit, day, onClose }: { habit: Habit | null; day: Da
                 scaleTo={0.85}
                 accessibilityLabel={m.label}
                 style={{
-                  width: 54,
-                  height: 54,
+                  width: 58,
+                  paddingVertical: 10,
+                  gap: 4,
                   borderRadius: radius.md,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: selected ? alpha(habit.color, 0.2) : t.surface,
-                  borderWidth: 1,
-                  borderColor: selected ? habit.color : t.border,
+                  backgroundColor: selected ? t.accent : t.surface2,
                 }}
               >
-                <Text size={26} style={{ opacity: mood && !selected ? 0.45 : 1 }}>
-                  {m.emoji}
+                <Icon
+                  name={m.icon}
+                  size={26}
+                  color={selected ? t.onAccent : mood ? t.textFaint : t.text}
+                  weight={selected ? 'fill' : 'regular'}
+                />
+                <Text variant="small" size={10} color={selected ? t.onAccent : t.textMuted}>
+                  {m.label}
                 </Text>
               </Tap>
             );

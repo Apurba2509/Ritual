@@ -8,8 +8,8 @@ export function habit(overrides: Partial<Habit> = {}): Habit {
   return {
     id: overrides.id ?? `h${n}`,
     name: 'Meditate',
-    emoji: '🧘',
-    color: '#8B5CF6',
+    icon: 'flower-lotus',
+    color: 'lilac',
     kind: 'check',
     target: 1,
     unit: null,

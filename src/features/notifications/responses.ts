@@ -29,14 +29,16 @@ export function useNotificationResponses() {
 
     if (response.actionIdentifier === ACTION_DONE && habit) {
       completeHabit(habit.id, todayKey(), 'notification');
-      useUI.getState().toast(`${habit.name} logged from your notification`, { emoji: '✅', tone: 'success' });
+      useUI.getState().toast(`${habit.name} logged from your notification`, { icon: 'check-circle', tone: 'success' });
       return;
     }
     if (response.actionIdentifier === ACTION_SNOOZE && habit) {
       snoozeHabit(habit.id, 60);
-      useUI.getState().toast(`Snoozed ${habit.name} for an hour`, { emoji: '⏰' });
+      useUI.getState().toast(`Snoozed ${habit.name} for an hour`, { icon: 'alarm' });
       return;
     }
     if (habit) router.push(`/habit/${habit.id}`);
+    else if (data.type === 'weekly') router.push('/(tabs)/insights');
+    else if (data.type === 'brief' || data.type === 'evening') router.push('/(tabs)');
   }, [response, status]);
 }

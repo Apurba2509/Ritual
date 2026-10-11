@@ -1,33 +1,46 @@
 import { Text as RNText, TextProps as RNTextProps, TextStyle } from 'react-native';
-import { fonts, Theme, useTheme } from './theme';
+import { FontWeight, fonts, Theme, useTheme } from './theme';
 
 export type TextVariant =
-  'hero' | 'title' | 'heading' | 'subheading' | 'body' | 'bodyStrong' | 'caption' | 'label' | 'number';
+  | 'display'
+  | 'hero'
+  | 'title'
+  | 'heading'
+  | 'subheading'
+  | 'body'
+  | 'bodyStrong'
+  | 'caption'
+  | 'small'
+  | 'label'
+  | 'number';
 
+// Inter Tight is set tight: large sizes get proportionally more negative tracking.
 const VARIANTS: Record<TextVariant, TextStyle> = {
-  hero: { fontFamily: fonts.display, fontSize: 40, lineHeight: 46, letterSpacing: -1 },
-  title: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, letterSpacing: -0.6 },
-  heading: { fontFamily: fonts.displaySemi, fontSize: 20, lineHeight: 26, letterSpacing: -0.2 },
-  subheading: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 22 },
-  body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
-  bodyStrong: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 22 },
+  display: { fontFamily: fonts.heavy, fontSize: 44, lineHeight: 46, letterSpacing: -2 },
+  hero: { fontFamily: fonts.bold, fontSize: 36, lineHeight: 40, letterSpacing: -1.4 },
+  title: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 33, letterSpacing: -0.9 },
+  heading: { fontFamily: fonts.semibold, fontSize: 20, lineHeight: 25, letterSpacing: -0.45 },
+  subheading: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, letterSpacing: -0.2 },
+  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, letterSpacing: -0.1 },
+  bodyStrong: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 22, letterSpacing: -0.1 },
   caption: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 18 },
-  label: { fontFamily: fonts.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 0.9, textTransform: 'uppercase' },
-  number: { fontFamily: fonts.display, fontSize: 28, lineHeight: 32, fontVariant: ['tabular-nums'] },
+  small: { fontFamily: fonts.semibold, fontSize: 11, lineHeight: 14 },
+  label: { fontFamily: fonts.mono, fontSize: 11, lineHeight: 14, letterSpacing: 1.1, textTransform: 'uppercase' },
+  number: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 32, letterSpacing: -1, fontVariant: ['tabular-nums'] },
 };
 
-type Tone = 'default' | 'muted' | 'faint' | 'accent' | 'xp' | 'success' | 'danger' | 'inverse';
+export type Tone = 'default' | 'muted' | 'faint' | 'accent' | 'success' | 'danger' | 'inverse' | 'onAccent';
 
 const toneColor = (t: Theme, tone: Tone) =>
   ({
     default: t.text,
     muted: t.textMuted,
     faint: t.textFaint,
-    accent: t.accent,
-    xp: t.xp,
+    accent: t.accentInk,
     success: t.success,
     danger: t.danger,
     inverse: t.bg,
+    onAccent: t.onAccent,
   })[tone];
 
 export interface TextProps extends RNTextProps {
@@ -36,9 +49,21 @@ export interface TextProps extends RNTextProps {
   color?: string;
   align?: TextStyle['textAlign'];
   size?: number;
+  weight?: FontWeight;
+  tabular?: boolean;
 }
 
-export function Text({ variant = 'body', tone = 'default', color, align, size, style, ...props }: TextProps) {
+export function Text({
+  variant = 'body',
+  tone = 'default',
+  color,
+  align,
+  size,
+  weight,
+  tabular,
+  style,
+  ...props
+}: TextProps) {
   const t = useTheme();
   const v = VARIANTS[variant];
   return (
@@ -47,7 +72,16 @@ export function Text({ variant = 'body', tone = 'default', color, align, size, s
       style={[
         v,
         { color: color ?? toneColor(t, tone), textAlign: align },
-        size ? { fontSize: size, lineHeight: Math.round(size * 1.18) } : null,
+        size
+          ? {
+              fontSize: size,
+              lineHeight: Math.round(size * (size >= 28 ? 1.12 : 1.3)),
+              // keep the tight look when a size is overridden
+              letterSpacing: size >= 24 ? -size * 0.035 : (v.letterSpacing ?? 0),
+            }
+          : null,
+        weight ? { fontFamily: fonts[weight] } : null,
+        tabular ? { fontVariant: ['tabular-nums'] } : null,
         style,
       ]}
     />

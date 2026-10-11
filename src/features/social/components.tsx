@@ -1,15 +1,26 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 import { useSession } from '@/data/session';
+import { HabitIcon } from '@/features/habits/HabitIcon';
 import { timeAgo } from '@/features/habits/format';
 import { Avatar } from '@/ui/Avatar';
 import { Card } from '@/ui/Card';
-import { Icon } from '@/ui/Icon';
+import { Icon, IconName } from '@/ui/Icon';
 import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
-import { alpha, useTheme } from '@/ui/theme';
+import { radius, useTheme } from '@/ui/theme';
 import { toggleKudos } from './api';
-import type { Activity, Challenge, PublicProfile } from './types';
+import type { Activity, ActivityType, Challenge, PublicProfile } from './types';
+
+const ACTIVITY_ICON: Record<ActivityType, IconName> = {
+  milestone: 'fire',
+  achievement: 'medal',
+  level: 'lightning',
+  perfect: 'star',
+  challenge_join: 'flag',
+  challenge_done: 'trophy',
+  joined: 'hand-waving',
+};
 
 export function ActivityCard({ item }: { item: Activity }) {
   const t = useTheme();
@@ -18,13 +29,31 @@ export function ActivityCard({ item }: { item: Activity }) {
   const gave = !!uid && item.kudos.includes(uid);
   return (
     <Card style={{ flexDirection: 'row', gap: 12 }}>
-      <Tap onPress={() => !mine && router.push(`/user/${item.uid}`)} scaleTo={0.92}>
-        <Avatar emoji={item.avatar?.emoji} color={item.avatar?.color} photoUrl={item.avatar?.photoUrl} size={42} />
+      <Tap onPress={() => !mine && router.push(`/user/${item.uid}`)} scaleTo={0.92} disabled={mine}>
+        <View>
+          <Avatar photoUrl={item.avatar?.photoUrl} name={item.displayName} seed={item.uid} size={42} />
+          <View
+            style={{
+              position: 'absolute',
+              right: -4,
+              bottom: -4,
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              backgroundColor: t.accent,
+              borderWidth: 2.5,
+              borderColor: t.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon name={ACTIVITY_ICON[item.type] ?? 'sparkle'} size={11} color={t.onAccent} weight="fill" />
+          </View>
+        </View>
       </Tap>
-      <View style={{ flex: 1, gap: 4 }}>
-        <Text>
-          <Text variant="bodyStrong">{mine ? 'You' : item.displayName}</Text> <Text tone="muted">{item.text}</Text>{' '}
-          {item.emoji}
+      <View style={{ flex: 1, gap: 8 }}>
+        <Text style={{ lineHeight: 21 }}>
+          <Text variant="bodyStrong">{mine ? 'You' : item.displayName}</Text> <Text tone="muted">{item.text}</Text>
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Text variant="caption" tone="faint">
@@ -40,21 +69,21 @@ export function ActivityCard({ item }: { item: Activity }) {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 4,
-                paddingHorizontal: 8,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: gave ? alpha(t.accent, 0.18) : t.surface2,
+                gap: 5,
+                paddingHorizontal: 10,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: gave ? t.accent : t.surface2,
               }}
               accessibilityLabel={gave ? 'Remove kudos' : 'Give kudos'}
             >
-              <Text size={12}>🔥</Text>
-              <Text
-                variant="caption"
-                size={11}
-                color={gave ? t.accent : t.textMuted}
-                style={{ fontFamily: 'Inter_600SemiBold' }}
-              >
+              <Icon
+                name="hands-clapping"
+                size={14}
+                color={gave ? t.onAccent : t.textMuted}
+                weight={gave ? 'fill' : 'bold'}
+              />
+              <Text variant="small" color={gave ? t.onAccent : t.textMuted}>
                 {item.kudos.length || (mine ? '' : 'Kudos')}
               </Text>
             </Tap>
@@ -71,54 +100,74 @@ export function RankRow({
   value,
   label,
   me,
+  last,
 }: {
   rank: number;
   profile: PublicProfile;
   value: number;
   label: string;
   me: boolean;
+  last?: boolean;
 }) {
   const t = useTheme();
-  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
+  const podium = rank <= 3;
   return (
     <Tap
       onPress={() => !me && router.push(`/user/${profile.uid}`)}
       scaleTo={0.985}
+      disabled={me}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 16,
-        backgroundColor: me ? alpha(t.accent, 0.1) : 'transparent',
-        borderWidth: me ? 1 : 0,
-        borderColor: alpha(t.accent, 0.35),
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        backgroundColor: me ? t.accentSoft : 'transparent',
+        borderBottomWidth: last ? 0 : 1,
+        borderBottomColor: t.border,
       }}
     >
-      <View style={{ width: 28, alignItems: 'center' }}>
-        {medal ? (
-          <Text size={20}>{medal}</Text>
-        ) : (
-          <Text variant="bodyStrong" tone="muted">
-            {rank}
-          </Text>
-        )}
+      <View
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 13,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: rank === 1 ? t.accent : podium ? t.surface3 : 'transparent',
+        }}
+      >
+        <Text variant="caption" weight="bold" tabular color={rank === 1 ? t.onAccent : podium ? t.text : t.textMuted}>
+          {rank}
+        </Text>
       </View>
-      <Avatar emoji={profile.avatar.emoji} color={profile.avatar.color} photoUrl={profile.avatar.photoUrl} size={38} />
-      <View style={{ flex: 1 }}>
+      <Avatar photoUrl={profile.avatar?.photoUrl} name={profile.displayName} seed={profile.uid} size={38} />
+      <View style={{ flex: 1, gap: 1 }}>
         <Text variant="bodyStrong" numberOfLines={1}>
           {me ? 'You' : profile.displayName}
         </Text>
-        <Text variant="caption" tone="muted">
-          Lv {profile.level} · 🔥 {profile.streak}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text variant="caption" tone="muted">
+            Lv {profile.level}
+          </Text>
+          {profile.streak > 0 ? (
+            <>
+              <Text variant="caption" tone="faint">
+                ·
+              </Text>
+              <Icon name="fire" size={11} color={t.textMuted} weight="fill" />
+              <Text variant="caption" tone="muted" tabular>
+                {profile.streak}
+              </Text>
+            </>
+          ) : null}
+        </View>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <Text variant="number" size={18}>
+        <Text weight="bold" size={17} tabular>
           {value.toLocaleString()}
         </Text>
-        <Text variant="caption" tone="faint" size={10}>
+        <Text variant="small" size={10} tone="faint">
           {label}
         </Text>
       </View>
@@ -131,22 +180,9 @@ export function ChallengeCard({ c, joined }: { c: Challenge; joined: boolean }) 
   return (
     <Card
       onPress={() => router.push(`/challenge/${c.id}`)}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}
     >
-      <View
-        style={{
-          width: 50,
-          height: 50,
-          borderRadius: 16,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: alpha(c.color, 0.16),
-          borderWidth: 1,
-          borderColor: alpha(c.color, 0.4),
-        }}
-      >
-        <Text size={24}>{c.emoji}</Text>
-      </View>
+      <HabitIcon icon={c.icon} color={c.color} size={48} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text variant="subheading" numberOfLines={1}>
           {c.title}
@@ -156,9 +192,21 @@ export function ChallengeCard({ c, joined }: { c: Challenge; joined: boolean }) 
         </Text>
       </View>
       {joined ? (
-        <Icon name="check-circle" size={20} color={t.success} />
+        <View
+          style={{
+            paddingHorizontal: 10,
+            height: 26,
+            borderRadius: radius.pill,
+            backgroundColor: t.accent,
+            justifyContent: 'center',
+          }}
+        >
+          <Text variant="small" color={t.onAccent}>
+            Joined
+          </Text>
+        </View>
       ) : (
-        <Icon name="chevron-right" size={18} color={t.textFaint} />
+        <Icon name="caret-right" size={16} color={t.textFaint} />
       )}
     </Card>
   );

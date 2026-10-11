@@ -1,7 +1,9 @@
+import { deviceValues } from '@/domain/activity';
 import type { DayKey } from '@/domain/dates';
 import type { EntrySource, Habit } from '@/domain/types';
 import { useApp } from '@/data/store';
 import { applyAutoValues } from '@/features/habits/actions';
+import { deviceData, sensingSupported } from '@/features/sensing';
 import { fetchGithubDaily } from './github';
 import { fetchHealthDaily, healthSupported } from './health';
 import { fetchLeetcodeDaily, leetcodeSupported } from './leetcode';
@@ -34,6 +36,12 @@ async function fetchFor(habit: Habit): Promise<{ values: Record<DayKey, number>;
     case 'health':
       if (!healthSupported) return null;
       return { values: await fetchHealthDaily(auto.metric, 30), source: 'health' };
+    case 'device':
+      if (!sensingSupported) return null;
+      return {
+        values: deviceValues(habit, await deviceData(30)),
+        source: auto.metric === 'steps' ? 'device' : 'workout',
+      };
   }
 }
 
@@ -44,7 +52,7 @@ export async function syncHabitNow(habit: Habit): Promise<number> {
 }
 
 export function runAutoTracking(
-  opts: { reason: 'launch' | 'foreground' | 'manual'; force?: boolean } = { reason: 'manual' },
+  opts: { reason: 'launch' | 'foreground' | 'manual' | 'background'; force?: boolean } = { reason: 'manual' },
 ) {
   if (running) return running;
   running = (async () => {
@@ -58,17 +66,23 @@ export function runAutoTracking(
     for (const habit of habits) {
       const auto = habit.auto!;
       const key =
-        auto.provider === 'health' ? `health:${auto.metric}` : `${auto.provider}:${auto.username.toLowerCase()}`;
-      if (!opts.force && now - (lastRun[key] ?? 0) < MIN_INTERVAL) continue;
+        auto.provider === 'health'
+          ? `health:${auto.metric}`
+          : auto.provider === 'device'
+            ? `device:${auto.metric}:${habit.kind}:${habit.unit ?? ''}`
+            : `${auto.provider}:${auto.username.toLowerCase()}`;
+      // On-device data is local and cheap, so it refreshes far more often than network providers.
+      const interval = auto.provider === 'device' ? 30_000 : MIN_INTERVAL;
+      if (!opts.force && now - (lastRun[key] ?? 0) < interval) continue;
       if (!cache.has(key)) cache.set(key, fetchFor(habit));
       try {
         const res = await cache.get(key)!;
         lastRun[key] = now;
         if (!res) continue;
         total += applyAutoValues(habit.id, normalize(habit, res.values), res.source);
-        markIntegration(auto.provider, null);
+        if (auto.provider !== 'device') markIntegration(auto.provider, null);
       } catch (e) {
-        markIntegration(auto.provider, e instanceof Error ? e.message : String(e));
+        if (auto.provider !== 'device') markIntegration(auto.provider, e instanceof Error ? e.message : String(e));
       }
     }
     return total;

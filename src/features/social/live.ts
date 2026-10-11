@@ -106,9 +106,9 @@ function start(uid: string) {
           for (const change of snap.docChanges()) {
             if (change.type !== 'added') continue;
             const x = change.doc.data();
-            if (x.type === 'nudge') useUI.getState().toast(`${x.fromName}: ${x.text}`, { emoji: '👋' });
+            if (x.type === 'nudge') useUI.getState().toast(`${x.fromName}: ${x.text}`, { icon: 'hand-waving' });
             else if (x.type === 'friend_accepted')
-              useUI.getState().toast(`${x.fromName} is now your friend`, { emoji: '🤝' });
+              useUI.getState().toast(`${x.fromName} is now your friend`, { icon: 'users-three' });
           }
         }
         firstInbox = false;

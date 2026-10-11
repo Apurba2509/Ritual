@@ -1,7 +1,7 @@
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { rankForLevel } from '@/domain/xp';
 import { useSession } from '@/data/session';
 import { toast } from '@/data/ui';
@@ -18,10 +18,13 @@ import { Chip, Pill } from '@/ui/Chip';
 import { EmptyState } from '@/ui/EmptyState';
 import { Screen, Section } from '@/ui/Screen';
 import { Text } from '@/ui/Text';
+import { isIconName } from '@/ui/Icon';
+import { useTheme } from '@/ui/theme';
 
-const NUDGES = ['Don’t break the streak! 🔥', 'You got this 💪', 'Race you to a perfect day 🏁', 'Proud of you 🙌'];
+const NUDGES = ['Don’t break the streak!', 'You got this', 'Race you to a perfect day', 'Proud of you'];
 
 export default function UserScreen() {
+  const t = useTheme();
   const { uid } = useLocalSearchParams<{ uid: string }>();
   const me = useSession((s) => s.user?.uid);
   const friendship = useSocial((s) => s.friendships.find((f) => me && f.id === pairId(me, uid)));
@@ -43,16 +46,14 @@ export default function UserScreen() {
   if (profile === null) {
     return (
       <Screen back>
-        <EmptyState emoji="🫥" title="User not found" />
+        <EmptyState icon="magnifying-glass" title="User not found" />
       </Screen>
     );
   }
   if (!profile) {
     return (
       <Screen back>
-        <Text tone="muted" align="center">
-          Loading…
-        </Text>
+        <ActivityIndicator color={t.textMuted} style={{ marginTop: 80 }} />
       </Screen>
     );
   }
@@ -74,20 +75,18 @@ export default function UserScreen() {
   return (
     <Screen back>
       <View style={{ alignItems: 'center', gap: 10 }}>
-        <Avatar
-          emoji={profile.avatar.emoji}
-          color={profile.avatar.color}
-          photoUrl={profile.avatar.photoUrl}
-          size={88}
-          ring={rank.color}
-        />
+        <Avatar photoUrl={profile.avatar?.photoUrl} name={profile.displayName} seed={profile.uid} size={92} />
         <View style={{ alignItems: 'center' }}>
           <Text variant="title">{profile.displayName}</Text>
           <Text variant="caption" tone="muted">
             @{profile.username}
           </Text>
         </View>
-        <Pill label={`${rank.emoji} ${rank.title} · Level ${profile.level}`} color={rank.color} />
+        <Pill
+          label={`${rank.title} · Level ${profile.level}`}
+          color={t.accentInk}
+          icon={isIconName(rank.icon) ? rank.icon : 'sparkle'}
+        />
         {profile.bio ? (
           <Text tone="muted" align="center">
             {profile.bio}
@@ -95,30 +94,38 @@ export default function UserScreen() {
         ) : null}
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 10 }}>
+      <Card padded={false} style={{ flexDirection: 'row', paddingVertical: 16 }}>
         {[
-          { label: 'Best streak now', value: profile.streak, emoji: '🔥' },
-          { label: 'Check-ins', value: profile.totalCompletions, emoji: '✅' },
-          { label: 'Badges', value: profile.achievements, emoji: '🏅' },
-        ].map((s) => (
-          <Card key={s.label} style={{ flex: 1, padding: 12, alignItems: 'center', gap: 2 }}>
-            <Text size={16}>{s.emoji}</Text>
-            <Text variant="number" size={22}>
-              {s.value}
+          { label: 'Best streak', value: profile.streak },
+          { label: 'Check-ins', value: profile.totalCompletions },
+          { label: 'Badges', value: profile.achievements },
+        ].map((s, i) => (
+          <View
+            key={s.label}
+            style={{
+              flex: 1,
+              gap: 4,
+              paddingHorizontal: 14,
+              borderRightWidth: i < 2 ? 1 : 0,
+              borderRightColor: t.border,
+            }}
+          >
+            <Text weight="bold" size={26} tabular>
+              {s.value.toLocaleString()}
             </Text>
-            <Text variant="caption" tone="muted" size={11} align="center">
+            <Text variant="caption" tone="muted">
               {s.label}
             </Text>
-          </Card>
+          </View>
         ))}
-      </View>
+      </Card>
 
       {me && me !== uid ? (
         isFriend ? (
           <Section title="Send a nudge">
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {NUDGES.map((n) => (
-                <Chip key={n} label={n} onPress={() => run(() => sendNudge(uid, n), 'Nudge sent 👋')} />
+                <Chip key={n} label={n} onPress={() => run(() => sendNudge(uid, n), 'Nudge sent')} />
               ))}
             </View>
           </Section>
@@ -143,7 +150,7 @@ export default function UserScreen() {
             ))}
           </View>
         ) : (
-          <Text tone="muted">No public activity yet.</Text>
+          <EmptyState compact icon="hands-clapping" title="Nothing yet" body="Milestones and badges show up here." />
         )}
       </Section>
 

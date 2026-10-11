@@ -8,6 +8,9 @@ import { sync } from '@/data/sync';
 import { useUI } from '@/data/ui';
 import { runAutoTracking } from './integrations/engine';
 import { rescheduleSoon } from './notifications/scheduler';
+import { importFinishedWorkouts, refreshSensing } from './sensing';
+import { registerBackgroundSensing } from './sensing/background';
+import { watchWidget } from '@/widget/register';
 import { postActivity } from './social/api';
 
 /** Achievement unlocks & level-ups are derived from the snapshot and celebrated once. */
@@ -26,10 +29,10 @@ export function useGamificationWatcher() {
         for (const id of ids) {
           ui.celebrate({ kind: 'achievement', id });
           const a = ACHIEVEMENT_BY_ID.get(id);
-          if (a) postActivity({ type: 'achievement', emoji: a.emoji, text: `unlocked “${a.title}”` });
+          if (a) postActivity({ type: 'achievement', text: `unlocked “${a.title}”` });
         }
       } else {
-        ui.toast(`${ids.length} achievements unlocked`, { emoji: '🏅', tone: 'success' });
+        ui.toast(`${ids.length} achievements unlocked`, { icon: 'medal', tone: 'success' });
       }
     }
     const level = snapshot.level.level;
@@ -37,7 +40,7 @@ export function useGamificationWatcher() {
       if (level - app.lastLevelSeen <= 2) {
         ui.burst();
         ui.celebrate({ kind: 'level', level });
-        postActivity({ type: 'level', emoji: '⚡', text: `reached level ${level}` });
+        postActivity({ type: 'level', text: `reached level ${level}` });
       }
       app.setLastLevelSeen(level);
     }
@@ -50,12 +53,16 @@ export function useForegroundTasks() {
   useEffect(() => {
     if (status !== 'ready') return;
     rescheduleSoon(800);
-    runAutoTracking({ reason: 'launch' });
+    importFinishedWorkouts();
+    runAutoTracking({ reason: 'launch' }).finally(refreshSensing);
+    registerBackgroundSensing();
+    watchWidget();
     const sub = AppState.addEventListener('change', (s) => {
       if (s !== 'active') return;
       rescheduleSoon(800);
       sync.flush();
-      runAutoTracking({ reason: 'foreground' });
+      importFinishedWorkouts();
+      runAutoTracking({ reason: 'foreground' }).finally(refreshSensing);
     });
     const unsubHabits = useApp.subscribe((s, prev) => {
       if (s.habits !== prev.habits || s.settings !== prev.settings) rescheduleSoon();

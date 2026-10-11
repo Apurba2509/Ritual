@@ -1,7 +1,16 @@
 import { create } from 'zustand';
+import type { IconName } from '@/ui/icons';
 
 export type Celebration =
-  | { kind: 'milestone'; habitName: string; emoji: string; streak: number; unit: 'day' | 'week'; bonus: number }
+  | {
+      kind: 'milestone';
+      habitName: string;
+      icon: string;
+      color: string;
+      streak: number;
+      unit: 'day' | 'week';
+      bonus: number;
+    }
   | { kind: 'achievement'; id: string }
   | { kind: 'level'; level: number }
   | { kind: 'perfect'; streak: number };
@@ -9,7 +18,7 @@ export type Celebration =
 export interface Toast {
   id: number;
   message: string;
-  emoji?: string;
+  icon?: IconName;
   tone: 'default' | 'success' | 'error';
   action?: { label: string; onPress: () => void };
 }

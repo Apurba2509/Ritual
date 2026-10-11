@@ -1,5 +1,5 @@
 import { Schema } from 'firebase/ai';
-import { HABIT_COLORS } from '@/domain/catalog';
+import { HABIT_TINT_KEYS, ICON_GROUPS } from '@/domain/catalog';
 import { scheduleLabel, targetLabel } from '@/domain/habits';
 import { localInsights } from '@/domain/insights';
 import { parseQuickLog, ParsedLog } from '@/domain/quickLog';
@@ -77,7 +77,9 @@ export async function planQuickLog(text: string, habits: Habit[]): Promise<Quick
     // Belt and braces: keep confident on-device matches the model missed.
     const seen = new Set(logs.map((l) => l.habitId));
     for (const l of local.logs) if (!seen.has(l.habitId) && l.confidence >= 0.5) logs.push({ ...l, note: null });
-    const unmatched = (res.unmatched ?? []).filter((u) => !local.logs.some((l) => l.clause.includes(u) || u.includes(l.clause)));
+    const unmatched = (res.unmatched ?? []).filter(
+      (u) => !local.logs.some((l) => l.clause.includes(u) || u.includes(l.clause)),
+    );
     return { logs, unmatched, engine: 'ai' };
   } catch {
     return { ...local, engine: 'local' };
@@ -86,9 +88,12 @@ export async function planQuickLog(text: string, habits: Habit[]): Promise<Quick
 
 // ─── Coach: goal → habit plan ───────────────────────────────────────────────
 
+/** Every icon the habit picker offers — the model must choose one of these. */
+const HABIT_ICONS = [...new Set(ICON_GROUPS.flatMap((g) => g.icons))];
+
 export interface CoachHabit {
   name: string;
-  emoji: string;
+  icon: string;
   kind: HabitKind;
   target: number;
   unit: string | null;
@@ -116,7 +121,7 @@ const coachSchema = Schema.object({
       items: Schema.object({
         properties: {
           name: Schema.string({ description: 'concise habit name, max 4 words, starts with a verb' }),
-          emoji: Schema.string({ description: 'one emoji' }),
+          icon: Schema.enumString({ enum: HABIT_ICONS, description: 'the icon that best depicts the habit' }),
           kind: Schema.enumString({ enum: ['check', 'count', 'duration'] }),
           target: Schema.number({ description: '1 for check; N for count; minutes for duration' }),
           unit: Schema.string({
@@ -138,12 +143,12 @@ const coachSchema = Schema.object({
 });
 
 export async function coachPlan(goal: string, context: { existing: Habit[]; name?: string }): Promise<CoachPlan> {
-  const existing =
-    context.existing.map((h) => `${h.emoji} ${h.name} (${scheduleLabel(h.schedule)})`).join(', ') || 'none';
+  const existing = context.existing.map((h) => `${h.name} (${scheduleLabel(h.schedule)})`).join(', ') || 'none';
   type Raw = {
     title: string;
     summary: string;
-    habits: (Omit<CoachHabit, 'schedule' | 'color'> & {
+    habits: (Omit<CoachHabit, 'schedule' | 'color' | 'icon'> & {
+      icon?: string;
       scheduleType: Schedule['type'];
       days?: number[];
       timesPerWeek?: number;
@@ -175,7 +180,7 @@ export async function coachPlan(goal: string, context: { existing: Habit[]; name
       const kind: HabitKind = ['check', 'count', 'duration'].includes(h.kind) ? h.kind : 'check';
       return {
         name: h.name,
-        emoji: h.emoji || '✨',
+        icon: h.icon && HABIT_ICONS.includes(h.icon) ? h.icon : 'sparkle',
         kind,
         target: kind === 'check' ? 1 : Math.max(1, Math.round(h.target)),
         unit: kind === 'check' ? null : kind === 'duration' ? 'min' : h.unit || 'times',
@@ -183,7 +188,7 @@ export async function coachPlan(goal: string, context: { existing: Habit[]; name
         difficulty: h.difficulty ?? 'medium',
         reminder: h.reminder && /^\d{2}:\d{2}$/.test(h.reminder) ? h.reminder : null,
         why: h.why,
-        color: HABIT_COLORS[(i * 3) % HABIT_COLORS.length],
+        color: HABIT_TINT_KEYS[(i * 2) % HABIT_TINT_KEYS.length],
       };
     }),
   };
@@ -212,7 +217,7 @@ export async function weeklyReview(snapshot: Snapshot): Promise<WeeklyReview> {
     .filter((s) => !s.habit.archived)
     .map(
       (s) =>
-        `${s.habit.emoji} ${s.habit.name}: streak ${s.streak.current} ${s.streak.unit}s (best ${s.streak.longest}), 30-day rate ${
+        `${s.habit.name}: streak ${s.streak.current} ${s.streak.unit}s (best ${s.streak.longest}), 30-day rate ${
           s.rate30 === null ? 'n/a' : Math.round(s.rate30 * 100) + '%'
         }, schedule ${scheduleLabel(s.habit.schedule)}`,
     )

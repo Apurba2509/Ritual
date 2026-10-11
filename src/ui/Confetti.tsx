@@ -1,10 +1,12 @@
 import { useEffect, useMemo } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { useUI } from '@/data/ui';
 import { useApp } from '@/data/store';
+import { useFrameHeight, useFrameWidth } from './layout';
 
-const COLORS = ['#FF6A3D', '#FBBF24', '#34D399', '#9D8CFF', '#38BDF8', '#FB7185', '#F5F5F7'];
+// Brand confetti: mostly volt and bone, with a few habit tints for sparkle.
+const COLORS = ['#D4FF3F', '#F4F4F1', '#D4FF3F', '#7FD8FF', '#D4FF3F', '#C4A6FF', '#F4F4F1', '#FF8A6B'];
 const COUNT = 46;
 
 interface Particle {
@@ -62,7 +64,8 @@ function Piece({ p, height, seed }: { p: Particle; height: number; seed: number 
 export function ConfettiLayer() {
   const seed = useUI((s) => s.confetti);
   const enabled = useApp((s) => s.settings.celebrations);
-  const { width, height } = useWindowDimensions();
+  const width = useFrameWidth();
+  const height = useFrameHeight();
 
   const particles = useMemo<Particle[]>(
     () =>

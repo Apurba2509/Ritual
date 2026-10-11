@@ -54,7 +54,7 @@ export interface Snapshot {
   newlyUnlocked: string[];
 }
 
-const AUTO_SOURCES = new Set(['github', 'leetcode', 'health']);
+const AUTO_SOURCES = new Set(['github', 'leetcode', 'health', 'device', 'workout']);
 
 export function computeSnapshot(input: SnapshotInput): Snapshot {
   const { today, weekStart } = input;

@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Share, View } from 'react-native';
+import { View } from 'react-native';
 import { useSession } from '@/data/session';
 import { useApp } from '@/data/store';
 import { toast } from '@/data/ui';
@@ -17,13 +17,15 @@ import { useSocial } from '@/features/social/live';
 import type { PublicProfile } from '@/features/social/types';
 import { timeAgo } from '@/features/habits/format';
 import { Avatar } from '@/ui/Avatar';
-import { Button } from '@/ui/Button';
+import { Button, IconButton } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { EmptyState } from '@/ui/EmptyState';
 import { Screen, Section } from '@/ui/Screen';
 import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
+import { useTheme } from '@/ui/theme';
+import { shareText } from '@/lib/share';
 
 function PersonRow({ p, right, sub }: { p: PublicProfile | undefined; right?: React.ReactNode; sub?: string }) {
   if (!p) return null;
@@ -32,11 +34,11 @@ function PersonRow({ p, right, sub }: { p: PublicProfile | undefined; right?: Re
       onPress={() => router.push(`/user/${p.uid}`)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }}
     >
-      <Avatar emoji={p.avatar.emoji} color={p.avatar.color} photoUrl={p.avatar.photoUrl} size={42} />
+      <Avatar photoUrl={p.avatar?.photoUrl} name={p.displayName} seed={p.uid} size={42} />
       <View style={{ flex: 1 }}>
         <Text variant="bodyStrong">{p.displayName}</Text>
         <Text variant="caption" tone="muted">
-          {sub ?? `@${p.username} · Lv ${p.level} · 🔥 ${p.streak}`}
+          {sub ?? `@${p.username} · Lv ${p.level} · ${p.streak}-day streak`}
         </Text>
       </View>
       {right}
@@ -45,6 +47,7 @@ function PersonRow({ p, right, sub }: { p: PublicProfile | undefined; right?: Re
 }
 
 export default function FriendsScreen() {
+  const t = useTheme();
   const uid = useSession((s) => s.user?.uid);
   const username = useApp((s) => s.profile.username);
   const friendships = useSocial((s) => s.friendships);
@@ -64,10 +67,11 @@ export default function FriendsScreen() {
     return (
       <Screen back title="Friends">
         <EmptyState
-          emoji="🤝"
+          icon="users-three"
           title="Sign in to add friends"
-          action="Create account"
-          onAction={() => router.replace('/account')}
+          action="Create free account"
+          actionIcon="arrow-right"
+          onAction={() => router.replace('/upgrade')}
         />
       </Screen>
     );
@@ -105,12 +109,14 @@ export default function FriendsScreen() {
 
   return (
     <Screen back title="Friends">
-      <Card tone="raised" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <View style={{ flex: 1 }}>
-          <Text variant="caption" tone="muted">
+          <Text variant="label" tone="muted">
             Your username
           </Text>
-          <Text variant="subheading">@{username ?? '—'}</Text>
+          <Text variant="heading" style={{ marginTop: 2 }}>
+            @{username ?? '…'}
+          </Text>
         </View>
         <Button
           title="Copy"
@@ -120,19 +126,19 @@ export default function FriendsScreen() {
           onPress={async () => {
             if (!username) return;
             await Clipboard.setStringAsync(username);
-            toast('Copied', { emoji: '📋' });
+            toast('Copied', { icon: 'copy' });
           }}
         />
         <Button
           title="Share"
           size="sm"
-          icon="share"
-          onPress={() => Share.share({ message: `Add me on Ritual: @${username} 🔥` })}
+          icon="export"
+          onPress={() => shareText(`Add me on Ritual: @${username} — https://ritual-37ccf.web.app`)}
         />
       </Card>
 
       <TextField
-        icon="search"
+        icon="magnifying-glass"
         value={query}
         onChangeText={(v) => {
           setQuery(v.toLowerCase().replace(/\s/g, ''));
@@ -145,8 +151,18 @@ export default function FriendsScreen() {
         onSubmitEditing={search}
         right={
           query ? (
-            <Tap onPress={search} hitSlop={8}>
-              <Text variant="bodyStrong" tone="accent">
+            <Tap
+              onPress={search}
+              hitSlop={8}
+              style={{
+                paddingHorizontal: 12,
+                height: 32,
+                borderRadius: 16,
+                justifyContent: 'center',
+                backgroundColor: t.accent,
+              }}
+            >
+              <Text variant="caption" weight="bold" color={t.onAccent}>
                 {searching ? '…' : 'Search'}
               </Text>
             </Tap>
@@ -166,8 +182,8 @@ export default function FriendsScreen() {
                 That’s you
               </Text>
             ) : existing?.status === 'accepted' ? (
-              <Text variant="caption" tone="success">
-                Friends ✓
+              <Text variant="caption" weight="semibold" tone="accent">
+                Friends
               </Text>
             ) : existing && existing.requester === uid ? (
               <Text variant="caption" tone="muted">
@@ -204,10 +220,10 @@ export default function FriendsScreen() {
                       loading={busy === f.id}
                       onPress={() => act(f.id, () => acceptFriend(f.id), 'New friend!')}
                     />
-                    <Button
-                      title="✕"
-                      size="sm"
-                      variant="ghost"
+                    <IconButton
+                      name="x"
+                      size={38}
+                      accessibilityLabel="Decline"
                       onPress={() => act(`x${f.id}`, () => removeFriendship(f.id))}
                     />
                   </View>
@@ -226,11 +242,12 @@ export default function FriendsScreen() {
             ))}
           </View>
         ) : (
-          <Card tone="outline">
-            <Text tone="muted" align="center">
-              Search a username above, or share yours. Friends see your milestones and can cheer you on.
-            </Text>
-          </Card>
+          <EmptyState
+            compact
+            icon="user-plus"
+            title="No friends yet"
+            body="Search a username above, or share yours. Friends see your milestones and can cheer you on."
+          />
         )}
       </Section>
 
@@ -261,14 +278,9 @@ export default function FriendsScreen() {
           <View style={{ gap: 8 }}>
             {inbox.slice(0, 15).map((i) => (
               <Card key={i.id} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', padding: 12 }}>
-                <Avatar
-                  emoji={i.fromAvatar?.emoji}
-                  color={i.fromAvatar?.color}
-                  photoUrl={i.fromAvatar?.photoUrl}
-                  size={34}
-                />
+                <Avatar photoUrl={i.fromAvatar?.photoUrl} name={i.fromName} seed={i.from} size={34} />
                 <Text variant="caption" style={{ flex: 1 }}>
-                  <Text variant="caption" style={{ fontFamily: 'Inter_600SemiBold' }}>
+                  <Text variant="caption" weight="bold">
                     {i.fromName}
                   </Text>{' '}
                   {i.text}

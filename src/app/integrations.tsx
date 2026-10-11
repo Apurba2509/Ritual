@@ -1,6 +1,6 @@
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { TEMPLATE_BY_ID } from '@/domain/catalog';
 import type { AutoSource, Habit, HealthMetric } from '@/domain/types';
@@ -14,13 +14,23 @@ import { runAutoTracking, syncHabitNow } from '@/features/integrations/engine';
 import { fetchGithubDaily, isValidGithubUsername } from '@/features/integrations/github';
 import { healthAvailability, healthSupported, requestHealthPermissions } from '@/features/integrations/health';
 import { fetchLeetcodeDaily, leetcodeSupported } from '@/features/integrations/leetcode';
+import {
+  disableAutoSensing,
+  enableAutoSensing,
+  openBatterySettings,
+  refreshSensing,
+  sensingSupported,
+  useSensing,
+} from '@/features/sensing';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Pill } from '@/ui/Chip';
+import { Icon, IconName } from '@/ui/Icon';
+import { ListGroup, ListRow } from '@/ui/ListRow';
 import { Screen, Section } from '@/ui/Screen';
 import { Text } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
-import { alpha, useTheme } from '@/ui/theme';
+import { radius, useTheme } from '@/ui/theme';
 
 /** Attach the source to a matching manual habit if one exists, otherwise create it from the template. */
 function createFromTemplate(templateId: string, auto: AutoSource): Habit {
@@ -35,7 +45,7 @@ function createFromTemplate(templateId: string, auto: AutoSource): Habit {
   }
   const id = app.createHabit({
     name: tpl.name,
-    emoji: tpl.emoji,
+    icon: tpl.icon,
     color: tpl.color,
     kind: tpl.kind,
     target: tpl.target,
@@ -51,23 +61,221 @@ function createFromTemplate(templateId: string, auto: AutoSource): Habit {
   return useApp.getState().habits[id];
 }
 
-function linkedHabits(habits: Habit[], provider: AutoSource['provider'], metric?: HealthMetric) {
-  return habits.filter(
-    (h) => h.auto?.provider === provider && (!metric || (h.auto.provider === 'health' && h.auto.metric === metric)),
+function linkedTo(habits: Habit[], match: (a: AutoSource) => boolean) {
+  return habits.filter((h) => h.auto && match(h.auto));
+}
+
+function ServiceHeader({ icon, title, body, on }: { icon: IconName; title: string; body: string; on?: boolean }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <View
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 14,
+          backgroundColor: t.surface2,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Icon name={icon} size={22} color={t.text} weight="fill" />
+      </View>
+      <View style={{ flex: 1, gap: 1 }}>
+        <Text variant="subheading">{title}</Text>
+        <Text variant="caption" tone="muted">
+          {body}
+        </Text>
+      </View>
+      {on ? <Pill label="On" color={t.accentInk} icon="check" /> : null}
+    </View>
   );
 }
+
+// ─── This phone ──────────────────────────────────────────────────────────────
+
+const DEVICE_TEMPLATES = ['steps', 'walk', 'run5k', 'cycle'];
+
+function PhoneSensing() {
+  const t = useTheme();
+  const habits = useHabitList();
+  const caps = useSensing((s) => s.caps);
+  const [busy, setBusy] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshSensing();
+    }, []),
+  );
+
+  if (!sensingSupported) {
+    return (
+      <Card style={{ gap: 12 }}>
+        <ServiceHeader
+          icon="device-mobile"
+          title="Phone sensors"
+          body="Steps, walks, runs and rides counted by the phone itself."
+        />
+        <Text variant="caption" tone="faint">
+          Available in the Android app. The web demo can’t read phone sensors.
+        </Text>
+      </Card>
+    );
+  }
+
+  const on = !!caps?.stepsEnabled || !!caps?.activityDetectionEnabled;
+
+  const toggle = async () => {
+    setBusy(true);
+    if (on) {
+      disableAutoSensing();
+      toast('Phone tracking off', { icon: 'device-mobile' });
+    } else {
+      const res = await enableAutoSensing();
+      if (res.steps || res.activity) {
+        toast('Phone tracking on', { icon: 'lightning', tone: 'success' });
+        runAutoTracking({ reason: 'manual', force: true }).catch(() => 0);
+      } else toast('Allow Physical activity to turn this on', { tone: 'error' });
+    }
+    setBusy(false);
+  };
+
+  const add = async (templateId: string) => {
+    const tpl = TEMPLATE_BY_ID.get(templateId)!;
+    if (!on) await enableAutoSensing();
+    const habit = createFromTemplate(templateId, { provider: 'device', metric: tpl.deviceMetric! });
+    const n = await syncHabitNow(habit).catch(() => 0);
+    toast(`${habit.name} now tracks itself${n ? ` · ${n} day${n > 1 ? 's' : ''} filled in` : ''}`, { tone: 'success' });
+  };
+
+  return (
+    <View style={{ gap: 10 }}>
+      <Card style={{ gap: 14 }}>
+        <ServiceHeader
+          icon="device-mobile"
+          title="Phone sensors"
+          body="Counts steps and notices walks, runs and rides with Ritual closed. No GPS or internet needed."
+          on={on}
+        />
+        <View style={{ gap: 8 }}>
+          {[
+            {
+              label: 'Step counter',
+              ok: !!caps?.stepsEnabled,
+              detail: caps?.stepCounter ? (caps.stepsEnabled ? 'Counting' : 'Off') : 'No sensor on this phone',
+            },
+            {
+              label: 'Activity detection',
+              ok: !!caps?.activityDetectionEnabled,
+              detail: caps?.activityDetectionEnabled ? 'Listening' : 'Off',
+            },
+            {
+              label: 'Barometer (elevation)',
+              ok: !!caps?.barometer,
+              detail: caps?.barometer ? 'Available' : 'Not on this phone, GPS used',
+            },
+          ].map((r) => (
+            <View key={r.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View
+                style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: r.ok ? t.accentInk : t.textFaint }}
+              />
+              <Text variant="caption" style={{ flex: 1 }}>
+                {r.label}
+              </Text>
+              <Text variant="caption" tone="muted">
+                {r.detail}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <Button
+          title={on ? 'Turn off' : 'Turn on phone tracking'}
+          variant={on ? 'secondary' : 'primary'}
+          loading={busy}
+          onPress={toggle}
+          full
+        />
+        {on && caps && !caps.batteryUnrestricted ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              alignItems: 'center',
+              padding: 12,
+              borderRadius: radius.md,
+              backgroundColor: t.surface2,
+            }}
+          >
+            <Icon name="warning" size={18} color={t.warning} />
+            <Text variant="caption" style={{ flex: 1 }}>
+              Some phones pause background apps to save battery. Let Ritual run unrestricted for reliable counting.
+            </Text>
+            <Button title="Allow" size="sm" variant="secondary" onPress={openBatterySettings} />
+          </View>
+        ) : null}
+      </Card>
+
+      <ListGroup>
+        {DEVICE_TEMPLATES.map((id, i) => {
+          const tpl = TEMPLATE_BY_ID.get(id)!;
+          const linked = linkedTo(habits, (a) => a.provider === 'device' && a.metric === tpl.deviceMetric).length > 0;
+          return (
+            <ListRow
+              key={id}
+              leading={<HabitIcon icon={tpl.icon} color={tpl.color} size={34} />}
+              title={tpl.name}
+              subtitle={linked ? 'Tracking automatically' : undefined}
+              right={
+                linked ? (
+                  <Icon name="check-circle" size={22} color={t.accentInk} weight="fill" />
+                ) : (
+                  <Button title="Add" size="sm" variant="secondary" onPress={() => add(id)} />
+                )
+              }
+              last={i === DEVICE_TEMPLATES.length - 1}
+            />
+          );
+        })}
+      </ListGroup>
+
+      <Card onPress={() => router.push('/workout')} style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: t.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon name="play" size={20} color={t.onAccent} weight="fill" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text variant="bodyStrong">Record a workout</Text>
+          <Text variant="caption" tone="muted">
+            GPS route, pace, splits, elevation. Offline.
+          </Text>
+        </View>
+        <Icon name="caret-right" size={16} color={t.textFaint} />
+      </Card>
+    </View>
+  );
+}
+
+// ─── GitHub / LeetCode ───────────────────────────────────────────────────────
 
 function AccountIntegration({
   provider,
   title,
-  emoji,
+  icon,
   description,
   templateId,
   supported,
 }: {
   provider: 'github' | 'leetcode';
   title: string;
-  emoji: string;
+  icon: IconName;
   description: string;
   templateId: string;
   supported: boolean;
@@ -75,7 +283,7 @@ function AccountIntegration({
   const t = useTheme();
   const state = useApp((s) => s.integrations[provider]);
   const habits = useHabitList();
-  const linked = linkedHabits(habits, provider);
+  const linked = linkedTo(habits, (a) => a.provider === provider);
   const [username, setUsername] = useState(state?.username ?? '');
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ days: number; total: number } | null>(null);
@@ -93,15 +301,14 @@ function AccountIntegration({
       const total = Object.values(data).reduce((a, b) => a + b, 0);
       setPreview({ days, total });
       useApp.getState().setIntegration(provider, { username: u, lastSyncAt: Date.now(), error: null });
-      // Re-point existing linked habits to the new account.
       for (const h of linked) useApp.getState().updateHabit(h.id, { auto: { provider, username: u } });
       if (!linked.length) {
         const habit = createFromTemplate(templateId, { provider, username: u });
         const n = await syncHabitNow(habit);
-        toast(`${habit.emoji} ${habit.name} created · ${n} days imported`, { tone: 'success' });
+        toast(`${habit.name} created · ${n} days imported`, { tone: 'success' });
       } else {
         await runAutoTracking({ reason: 'manual', force: true });
-        toast(`${title} connected`, { emoji: '⚡', tone: 'success' });
+        toast(`${title} connected`, { icon: 'lightning', tone: 'success' });
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not connect', { tone: 'error' });
@@ -110,25 +317,16 @@ function AccountIntegration({
   };
 
   return (
-    <Card style={{ gap: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Text size={30}>{emoji}</Text>
-        <View style={{ flex: 1 }}>
-          <Text variant="subheading">{title}</Text>
-          <Text variant="caption" tone="muted">
-            {description}
-          </Text>
-        </View>
-        {state ? <Pill label="Connected" color={t.success} icon="check" /> : null}
-      </View>
+    <Card style={{ gap: 14 }}>
+      <ServiceHeader icon={icon} title={title} body={description} on={!!state} />
       {!supported ? (
         <Text variant="caption" tone="faint">
-          Available in the Android/iOS app (the {title} API blocks browsers).
+          Available in the Android app (the {title} API blocks browsers).
         </Text>
       ) : (
         <>
           <TextField
-            icon="at-sign"
+            icon="at"
             value={username}
             onChangeText={setUsername}
             placeholder={`${title} username`}
@@ -138,7 +336,7 @@ function AccountIntegration({
             hint={state?.lastSyncAt ? `Last synced ${timeAgo(state.lastSyncAt)}` : undefined}
           />
           {preview ? (
-            <Text variant="caption" tone="success">
+            <Text variant="caption" tone="accent" weight="semibold">
               Found {preview.total} {provider === 'github' ? 'contributions' : 'submissions'} across {preview.days} days
               in the last year.
             </Text>
@@ -148,32 +346,32 @@ function AccountIntegration({
             loading={busy}
             onPress={connect}
             variant={state ? 'secondary' : 'primary'}
+            full
           />
         </>
       )}
       {linked.map((h) => (
         <View key={h.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <HabitIcon emoji={h.emoji} color={h.color} size={30} />
+          <HabitIcon icon={h.icon} color={h.color} size={30} />
           <Text variant="caption" style={{ flex: 1 }}>
             {h.name}
           </Text>
-          <Text variant="caption" tone="faint">
-            auto ⚡
-          </Text>
+          <Pill label="Auto" icon="lightning" />
         </View>
       ))}
     </Card>
   );
 }
 
+// ─── Health Connect ──────────────────────────────────────────────────────────
+
 const HEALTH_OPTIONS: { metric: HealthMetric; templateId: string; label: string }[] = [
-  { metric: 'steps', templateId: 'steps', label: 'Steps → “Walk 8,000 steps”' },
-  { metric: 'exercise', templateId: 'workout', label: 'Workouts → “Work out 30 min”' },
-  { metric: 'sleep', templateId: 'sleep', label: 'Sleep → “Sleep 7+ hours”' },
+  { metric: 'steps', templateId: 'steps', label: 'Steps' },
+  { metric: 'exercise', templateId: 'workout', label: 'Workouts' },
+  { metric: 'sleep', templateId: 'sleep', label: 'Sleep' },
 ];
 
 function HealthIntegration() {
-  const t = useTheme();
   const habits = useHabitList();
   const state = useApp((s) => s.integrations.health);
   const [availability, setAvailability] = useState<'available' | 'needs-install' | 'unsupported' | 'checking'>(
@@ -190,11 +388,11 @@ function HealthIntegration() {
     try {
       const ok = await requestHealthPermissions();
       if (!ok) throw new Error('Permission not granted in Health Connect.');
-      let habit = linkedHabits(habits, 'health', metric)[0];
+      let habit = linkedTo(habits, (a) => a.provider === 'health' && a.metric === metric)[0];
       if (!habit) habit = createFromTemplate(templateId, { provider: 'health', metric });
       const n = await syncHabitNow(habit);
       useApp.getState().setIntegration('health', { lastSyncAt: Date.now(), error: null });
-      toast(`${habit.emoji} ${habit.name} now tracks itself${n ? ` · ${n} days imported` : ''}`, { tone: 'success' });
+      toast(`${habit.name} now tracks itself${n ? ` · ${n} days imported` : ''}`, { tone: 'success' });
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Health Connect error', { tone: 'error' });
     }
@@ -202,17 +400,13 @@ function HealthIntegration() {
   };
 
   return (
-    <Card style={{ gap: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Text size={30}>❤️</Text>
-        <View style={{ flex: 1 }}>
-          <Text variant="subheading">Health Connect</Text>
-          <Text variant="caption" tone="muted">
-            Steps, workouts & sleep from Google Fit, Samsung Health, Fitbit, Strava…
-          </Text>
-        </View>
-        {state?.lastSyncAt ? <Pill label="Active" color={t.success} icon="check" /> : null}
-      </View>
+    <Card style={{ gap: 14 }}>
+      <ServiceHeader
+        icon="heartbeat"
+        title="Health Connect"
+        body="Import from Google Fit, Samsung Health, Fitbit, Strava and other apps."
+        on={!!state?.lastSyncAt}
+      />
       {!healthSupported ? (
         <Text variant="caption" tone="faint">
           {Platform.OS === 'ios' ? 'Apple Health support is on the roadmap.' : 'Available in the Android app.'}
@@ -228,23 +422,23 @@ function HealthIntegration() {
           Health Connect isn’t available on this device.
         </Text>
       ) : (
-        HEALTH_OPTIONS.map((o) => {
-          const on = linkedHabits(habits, 'health', o.metric).length > 0;
-          return (
-            <View key={o.metric} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text variant="caption" style={{ flex: 1 }}>
-                {o.label}
-              </Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {HEALTH_OPTIONS.map((o) => {
+            const on = linkedTo(habits, (a) => a.provider === 'health' && a.metric === o.metric).length > 0;
+            return (
               <Button
-                title={on ? 'Sync' : 'Enable'}
+                key={o.metric}
+                title={o.label}
+                icon={on ? 'check' : 'plus'}
                 size="sm"
-                variant={on ? 'secondary' : 'primary'}
+                variant={on ? 'secondary' : 'outline'}
                 loading={busy === o.metric}
                 onPress={() => enable(o.metric, o.templateId)}
+                style={{ flex: 1 }}
               />
-            </View>
-          );
-        })
+            );
+          })}
+        </View>
       )}
       {state?.error ? (
         <Text variant="caption" tone="danger">
@@ -256,67 +450,61 @@ function HealthIntegration() {
 }
 
 export default function IntegrationsScreen() {
-  const t = useTheme();
   return (
-    <Screen
-      back
-      title="Auto-tracking"
-      subtitle="Habits that check themselves off. Synced on launch, on resume, and when you pull to refresh."
-    >
-      <AccountIntegration
-        provider="github"
-        title="GitHub"
-        emoji="🐙"
-        description="Any public contribution counts — commits, PRs, reviews."
-        templateId="code"
-        supported
-      />
-      <AccountIntegration
-        provider="leetcode"
-        title="LeetCode"
-        emoji="🧩"
-        description="Days you submit a solution count toward your DSA streak."
-        templateId="leetcode"
-        supported={leetcodeSupported}
-      />
-      <HealthIntegration />
+    <Screen back title="Auto-tracking" subtitle="Habits that check themselves off, so you don’t have to.">
+      <Section title="This phone">
+        <PhoneSensing />
+      </Section>
+
+      <Section title="Accounts">
+        <View style={{ gap: 10 }}>
+          <AccountIntegration
+            provider="github"
+            title="GitHub"
+            icon="github-logo"
+            description="Any public contribution counts: commits, PRs, reviews."
+            templateId="code"
+            supported
+          />
+          <AccountIntegration
+            provider="leetcode"
+            title="LeetCode"
+            icon="code"
+            description="Days you submit a solution count toward your DSA streak."
+            templateId="leetcode"
+            supported={leetcodeSupported}
+          />
+        </View>
+      </Section>
+
+      <Section title="Other apps">
+        <HealthIntegration />
+      </Section>
 
       <Section title="Also hands-free">
-        <Card style={{ gap: 10 }}>
-          {[
-            { emoji: '🔔', title: 'Notification ✓ Done', body: 'Log from the reminder without opening the app.' },
-            { emoji: '⏳', title: 'Focus timer', body: 'Time-based habits log themselves when the session ends.' },
-            {
-              emoji: '🪄',
-              title: 'Tell Ritual what you did',
-              body: aiConfigured
+        <ListGroup>
+          <ListRow
+            icon="bell"
+            title="Done from the notification"
+            subtitle="Log from a reminder without opening the app."
+          />
+          <ListRow
+            icon="timer"
+            title="Focus timer"
+            subtitle="Time-based habits log themselves when the session ends."
+          />
+          <ListRow
+            icon="sparkle"
+            title="Tell Ritual what you did"
+            subtitle={
+              aiConfigured
                 ? 'Gemini turns a sentence into check-ins.'
-                : 'On-device parsing turns a sentence into check-ins.',
-            },
-          ].map((f) => (
-            <View key={f.title} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: alpha(t.xp, 0.14),
-                }}
-              >
-                <Text size={16}>{f.emoji}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyStrong">{f.title}</Text>
-                <Text variant="caption" tone="muted">
-                  {f.body}
-                </Text>
-              </View>
-            </View>
-          ))}
-          <Button title="Try quick log" variant="secondary" icon="message-circle" onPress={() => router.push('/log')} />
-        </Card>
+                : 'On-device parsing turns a sentence into check-ins.'
+            }
+            onPress={() => router.push('/log')}
+            last
+          />
+        </ListGroup>
       </Section>
     </Screen>
   );

@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import type { DayKey } from '@/domain/dates';
 import { isScheduledOn } from '@/domain/habits';
 import type { EntrySource } from '@/domain/types';
@@ -6,7 +7,8 @@ import { getSnapshot, useClock } from '@/data/hooks';
 import { EntryChange, useApp } from '@/data/store';
 import { useUI } from '@/data/ui';
 import { haptic } from '@/lib/haptics';
-import { rescheduleSoon } from '@/features/notifications/scheduler';
+import { notifyAutoComplete, rescheduleSoon } from '@/features/notifications/scheduler';
+import { autoLabel, formatProgress } from './format';
 import { postActivity } from '@/features/social/api';
 
 /**
@@ -33,14 +35,14 @@ function afterChange(habitId: string, day: DayKey, change: EntryChange | null, o
       ui.celebrate({
         kind: 'milestone',
         habitName: stats.habit.name,
-        emoji: stats.habit.emoji,
+        icon: stats.habit.icon,
+        color: stats.habit.color,
         streak: current,
         unit,
         bonus,
       });
       postActivity({
         type: 'milestone',
-        emoji: stats.habit.emoji,
         text: `hit a ${current}-${unit} streak on ${stats.habit.name}`,
       });
     }
@@ -50,11 +52,11 @@ function afterChange(habitId: string, day: DayKey, change: EntryChange | null, o
     if (required && todaySummary && todaySummary.due > 1 && todaySummary.done === todaySummary.due && !opts.quiet) {
       ui.burst();
       ui.toast(`Perfect day! Everything done${snap.perfectRun > 1 ? ` · ${snap.perfectRun} in a row` : ''}`, {
-        emoji: '🌟',
+        icon: 'star',
         tone: 'success',
       });
       if (snap.perfectRun === 7 || snap.perfectRun === 30) {
-        postActivity({ type: 'perfect', emoji: '🌟', text: `completed ${snap.perfectRun} perfect days in a row` });
+        postActivity({ type: 'perfect', text: `completed ${snap.perfectRun} perfect days in a row` });
       }
     }
   } else if (!change.isDone && change.wasDone) {
@@ -110,6 +112,13 @@ export function applyAutoValues(habitId: string, values: Record<DayKey, number>,
       const wasDone = !!todayBefore && !todayBefore.deleted && todayBefore.value >= (h?.target ?? 1);
       const isDone = !todayAfter.deleted && todayAfter.value >= (h?.target ?? 1);
       afterChange(habitId, today, { wasDone, isDone, entry: todayAfter }, { quiet: true });
+      // Completed itself while you weren't looking: tell you (in the app it shows as a toast instead).
+      if (h && isDone && !wasDone) {
+        const detail = `${h.kind === 'check' ? 'Done' : formatProgress(h, todayAfter.value)} · ${autoLabel(h.auto) ?? 'auto-tracked'}`;
+        if (AppState.currentState === 'active')
+          useUI.getState().toast(`${h.name} completed itself`, { icon: 'lightning', tone: 'success' });
+        else notifyAutoComplete(h, detail).catch(() => {});
+      }
     }
   }
   return changed;

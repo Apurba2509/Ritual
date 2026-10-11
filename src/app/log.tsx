@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -8,6 +8,8 @@ import { useApp } from '@/data/store';
 import { toast } from '@/data/ui';
 import { planQuickLog, QuickLogPlan } from '@/features/ai/features';
 import { aiConfigured } from '@/features/ai/gemini';
+import { useVoiceInput } from '@/features/ai/voice';
+import { LiveDot } from '@/features/sensing/TrackingStatus';
 import { addProgress } from '@/features/habits/actions';
 import { formatAmount, stepFor } from '@/features/habits/format';
 import { HabitIcon } from '@/features/habits/HabitIcon';
@@ -23,11 +25,19 @@ export default function QuickLogScreen() {
   const insets = useSafeAreaInsets();
   const habits = useHabitList();
   const today = useToday();
+  const { voice } = useLocalSearchParams<{ voice?: string }>();
   const [text, setText] = useState('');
   const input = useRef<TextInput>(null);
+  const mic = useVoiceInput((spoken, isFinal) => {
+    setText(spoken);
+    setPlan(null);
+    if (isFinal) analyze(spoken);
+  });
   useEffect(() => {
-    const id = setTimeout(() => input.current?.focus(), 250);
+    const id = setTimeout(() => (voice === '1' ? mic.start() : input.current?.focus()), 250);
     return () => clearTimeout(id);
+    // start once on open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [busy, setBusy] = useState(false);
   const [plan, setPlan] = useState<QuickLogPlan | null>(null);
@@ -45,10 +55,10 @@ export default function QuickLogScreen() {
     [habits],
   );
 
-  const analyze = async () => {
-    if (!text.trim()) return;
+  const analyze = async (said: string = text) => {
+    if (!said.trim()) return;
     setBusy(true);
-    const result = await planQuickLog(text, habits);
+    const result = await planQuickLog(said, habits);
     setPlan(result);
     setAmounts(Object.fromEntries(result.logs.map((l) => [l.habitId, l.amount])));
     setExcluded(new Set());
@@ -71,7 +81,7 @@ export default function QuickLogScreen() {
     }
     if (n) {
       useApp.getState().bumpAiLogs();
-      toast(`Logged ${n} habit${n > 1 ? 's' : ''}`, { emoji: '🪄', tone: 'success' });
+      toast(`Logged ${n} habit${n > 1 ? 's' : ''}`, { icon: 'magic-wand', tone: 'success' });
     }
     router.back();
   };
@@ -101,15 +111,15 @@ export default function QuickLogScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <View
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  backgroundColor: t.xpSoft,
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  backgroundColor: t.accentSoft,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Icon name="message-circle" size={17} color={t.xp} />
+                <Icon name="sparkle" size={19} color={t.accentInk} weight="fill" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text variant="subheading">Tell Ritual what you did</Text>
@@ -122,29 +132,66 @@ export default function QuickLogScreen() {
 
             <TextInput
               ref={input}
-              autoFocus
               multiline
               value={text}
               onChangeText={(v) => {
                 setText(v);
                 if (plan) setPlan(null);
               }}
-              placeholder="Ran 5k this morning, read 20 pages and drank 6 glasses of water…"
+              placeholder={
+                mic.listening ? 'Listening…' : 'Ran 5k this morning, read 20 pages and drank 6 glasses of water…'
+              }
               placeholderTextColor={t.textFaint}
-              selectionColor={t.accent}
-              style={{
-                minHeight: 96,
-                maxHeight: 180,
-                color: t.text,
-                fontFamily: fonts.body,
-                fontSize: 18,
-                lineHeight: 26,
-                textAlignVertical: 'top',
-              }}
-              onSubmitEditing={analyze}
+              selectionColor={t.scheme === 'dark' ? t.accent : t.text}
+              cursorColor={t.scheme === 'dark' ? t.accent : t.text}
+              style={
+                {
+                  minHeight: 104,
+                  maxHeight: 200,
+                  color: t.text,
+                  fontFamily: fonts.medium,
+                  fontSize: 21,
+                  lineHeight: 29,
+                  letterSpacing: -0.4,
+                  textAlignVertical: 'top',
+                  outlineStyle: 'none',
+                } as object
+              }
+              onSubmitEditing={() => analyze()}
               blurOnSubmit
               returnKeyType="done"
             />
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Tap
+                onPress={mic.listening ? mic.stop : mic.start}
+                scaleTo={0.9}
+                haptics="medium"
+                accessibilityRole="button"
+                accessibilityLabel={mic.listening ? 'Stop listening' : 'Speak instead'}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  height: 46,
+                  paddingHorizontal: 18,
+                  borderRadius: 23,
+                  backgroundColor: mic.listening ? t.accent : t.surface2,
+                }}
+              >
+                {mic.listening ? (
+                  <LiveDot color={t.onAccent} size={8} />
+                ) : (
+                  <Icon name="microphone" size={18} color={t.text} weight="fill" />
+                )}
+                <Text variant="bodyStrong" color={mic.listening ? t.onAccent : t.text}>
+                  {mic.listening ? 'Listening… tap to stop' : 'Say it'}
+                </Text>
+              </Tap>
+              <Text variant="caption" tone="faint" style={{ flex: 1 }}>
+                {mic.listening ? 'Speak naturally. Ritual logs it when you pause.' : 'or type, then press Log it'}
+              </Text>
+            </View>
 
             {!plan && examples.length ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -162,8 +209,8 @@ export default function QuickLogScreen() {
                   </Text>
                   <Pill
                     label={plan.engine === 'ai' ? 'Gemini' : 'On-device'}
-                    color={plan.engine === 'ai' ? t.xp : t.textMuted}
-                    icon={plan.engine === 'ai' ? 'zap' : 'cpu'}
+                    color={plan.engine === 'ai' ? t.accentInk : t.textMuted}
+                    icon={plan.engine === 'ai' ? 'sparkle' : 'device-mobile'}
                   />
                 </View>
                 {plan.logs.map((l) => {
@@ -179,14 +226,12 @@ export default function QuickLogScreen() {
                         alignItems: 'center',
                         gap: 12,
                         padding: 10,
-                        borderRadius: radius.md,
-                        backgroundColor: t.surface,
-                        borderWidth: 1,
-                        borderColor: t.border,
+                        borderRadius: radius.lg,
+                        backgroundColor: t.surface2,
                         opacity: off ? 0.45 : 1,
                       }}
                     >
-                      <HabitIcon emoji={h.emoji} color={h.color} size={38} filled={!off} />
+                      <HabitIcon icon={h.icon} color={h.color} size={40} />
                       <View style={{ flex: 1 }}>
                         <Text variant="bodyStrong" numberOfLines={1}>
                           {h.name}
@@ -226,7 +271,12 @@ export default function QuickLogScreen() {
                         hitSlop={8}
                         accessibilityLabel={off ? 'Include' : 'Exclude'}
                       >
-                        <Icon name={off ? 'circle' : 'check-circle'} size={22} color={off ? t.textFaint : t.success} />
+                        <Icon
+                          name={off ? 'plus-circle' : 'check-circle'}
+                          size={26}
+                          color={off ? t.textFaint : t.accentInk}
+                          weight={off ? 'regular' : 'fill'}
+                        />
                       </Tap>
                     </View>
                   );
@@ -242,7 +292,7 @@ export default function QuickLogScreen() {
                         setTimeout(() => router.push('/habit/edit'), 200);
                       }}
                     >
-                      <Text variant="caption" tone="accent" style={{ fontFamily: 'Inter_600SemiBold' }}>
+                      <Text variant="caption" weight="bold">
                         + Turn it into a habit
                       </Text>
                     </Tap>
@@ -263,12 +313,12 @@ export default function QuickLogScreen() {
             ) : (
               <Button
                 title={busy ? 'Thinking…' : 'Log it'}
-                icon="send"
+                icon="paper-plane-tilt"
                 size="lg"
                 full
                 loading={busy}
                 disabled={!text.trim()}
-                onPress={analyze}
+                onPress={() => analyze()}
               />
             )}
           </ScrollView>

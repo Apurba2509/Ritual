@@ -1,11 +1,10 @@
 import { ActivityIndicator, StyleProp, View, ViewStyle } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Icon, IconName } from './Icon';
 import { Tap } from './Tap';
 import { Text } from './Text';
-import { radius, useTheme, shadow } from './theme';
+import { alpha, radius, useTheme } from './theme';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'xp';
+type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'inverse';
 type Size = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps {
@@ -15,6 +14,8 @@ export interface ButtonProps {
   size?: Size;
   icon?: IconName;
   iconRight?: IconName;
+  /** Custom leading element (e.g. the Google "G"). */
+  leading?: React.ReactNode;
   loading?: boolean;
   disabled?: boolean;
   full?: boolean;
@@ -22,7 +23,7 @@ export interface ButtonProps {
   accessibilityLabel?: string;
 }
 
-const HEIGHT: Record<Size, number> = { sm: 38, md: 48, lg: 56 };
+const HEIGHT: Record<Size, number> = { sm: 38, md: 50, lg: 56 };
 
 export function Button({
   title,
@@ -31,6 +32,7 @@ export function Button({
   size = 'md',
   icon,
   iconRight,
+  leading,
   loading,
   disabled,
   full,
@@ -39,77 +41,63 @@ export function Button({
 }: ButtonProps) {
   const t = useTheme();
   const height = HEIGHT[size];
+  const inverseBg = t.scheme === 'dark' ? '#FFFFFF' : t.text;
+  const inverseFg = t.scheme === 'dark' ? '#0B0B0C' : '#FFFFFF';
 
-  const fg =
-    variant === 'primary' || variant === 'xp'
-      ? '#FFFFFF'
-      : variant === 'danger'
-        ? t.danger
-        : variant === 'ghost'
-          ? t.textMuted
-          : t.text;
-
-  const bg = variant === 'secondary' ? t.surface2 : variant === 'danger' ? t.dangerSoft : 'transparent';
-
-  const content = (
-    <View
-      style={{
-        height,
-        paddingHorizontal: size === 'sm' ? 14 : 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-      }}
-    >
-      {loading ? (
-        <ActivityIndicator color={fg} />
-      ) : (
-        <>
-          {icon ? <Icon name={icon} size={size === 'sm' ? 16 : 18} color={fg} /> : null}
-          <Text variant="bodyStrong" color={fg} size={size === 'sm' ? 14 : size === 'lg' ? 16 : 15}>
-            {title}
-          </Text>
-          {iconRight ? <Icon name={iconRight} size={size === 'sm' ? 16 : 18} color={fg} /> : null}
-        </>
-      )}
-    </View>
-  );
-
-  const gradient = variant === 'primary' ? [t.accent, t.emberDeep] : variant === 'xp' ? [t.xp, '#6D5AE6'] : null;
+  const fg = {
+    primary: t.onAccent,
+    secondary: t.text,
+    outline: t.text,
+    ghost: t.textMuted,
+    danger: t.danger,
+    inverse: inverseFg,
+  }[variant];
+  const bg = {
+    primary: t.accent,
+    secondary: t.surface2,
+    outline: 'transparent',
+    ghost: 'transparent',
+    danger: t.dangerSoft,
+    inverse: inverseBg,
+  }[variant];
+  const iconSize = size === 'sm' ? 16 : 19;
 
   return (
     <Tap
       onPress={onPress}
       disabled={disabled || loading}
       haptics={variant === 'primary' ? 'light' : 'tap'}
+      scaleTo={0.97}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
       style={[
         {
-          borderRadius: radius.md,
-          overflow: 'hidden',
-          alignSelf: full ? 'stretch' : 'auto',
+          height,
+          paddingHorizontal: size === 'sm' ? 14 : 22,
+          borderRadius: size === 'sm' ? radius.sm + 2 : radius.md + 3,
           backgroundColor: bg,
+          alignSelf: full ? 'stretch' : 'auto',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 9,
         },
-        variant === 'primary' && {
-          ...shadow(t.accent, t.scheme === 'dark' ? 0.35 : 0.25, 16, 6),
-        },
-        variant === 'secondary' && { borderWidth: 1, borderColor: t.border },
+        variant === 'outline' && { borderWidth: 1, borderColor: t.borderStrong },
+        variant === 'inverse' && t.scheme === 'dark' && { borderWidth: 1, borderColor: alpha('#000000', 0.06) },
         style,
       ]}
     >
-      {gradient ? (
-        <LinearGradient
-          colors={gradient as [string, string]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ borderRadius: radius.md }}
-        >
-          {content}
-        </LinearGradient>
+      {loading ? (
+        <ActivityIndicator color={fg} />
       ) : (
-        content
+        <>
+          {leading}
+          {icon ? <Icon name={icon} size={iconSize} color={fg} /> : null}
+          <Text variant="bodyStrong" color={fg} size={size === 'sm' ? 14 : 16} style={{ letterSpacing: -0.2 }}>
+            {title}
+          </Text>
+          {iconRight ? <Icon name={iconRight} size={iconSize} color={fg} /> : null}
+        </>
       )}
     </Tap>
   );
@@ -123,6 +111,7 @@ export function IconButton({
   background,
   accessibilityLabel,
   badge,
+  weight = 'bold',
 }: {
   name: IconName;
   onPress?: () => void;
@@ -131,6 +120,7 @@ export function IconButton({
   background?: string;
   accessibilityLabel: string;
   badge?: boolean;
+  weight?: 'regular' | 'bold' | 'fill';
 }) {
   const t = useTheme();
   return (
@@ -147,21 +137,21 @@ export function IconButton({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: background ?? t.surface2,
-        borderWidth: background ? 0 : 1,
-        borderColor: t.border,
       }}
     >
-      <Icon name={name} size={size * 0.46} color={tint ?? t.text} />
+      <Icon name={name} size={Math.round(size * 0.45)} color={tint ?? t.text} weight={weight} />
       {badge ? (
         <View
           style={{
             position: 'absolute',
-            top: size * 0.18,
-            right: size * 0.18,
-            width: 8,
-            height: 8,
-            borderRadius: 4,
+            top: size * 0.16,
+            right: size * 0.16,
+            width: 9,
+            height: 9,
+            borderRadius: 5,
             backgroundColor: t.accent,
+            borderWidth: 2,
+            borderColor: background ?? t.surface2,
           }}
         />
       ) : null}

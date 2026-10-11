@@ -1,35 +1,38 @@
 import { View } from 'react-native';
-import { Text } from '@/ui/Text';
-import { alpha, useTheme } from '@/ui/theme';
+import { Icon, isIconName } from '@/ui/Icon';
+import { alpha, tint, useTheme } from '@/ui/theme';
 
+/** A habit's icon on a softly tinted tile. `solid` fills the tile (used for done / selected). */
 export function HabitIcon({
-  emoji,
+  icon,
   color,
-  size = 46,
-  filled,
+  size = 44,
+  solid,
 }: {
-  emoji: string;
+  icon: string;
   color: string;
   size?: number;
-  filled?: boolean;
+  solid?: boolean;
 }) {
   const t = useTheme();
+  const c = tint(color, t);
   return (
     <View
       style={{
         width: size,
         height: size,
-        borderRadius: size * 0.32,
+        borderRadius: Math.round(size * 0.32),
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: filled
-          ? alpha(color, t.scheme === 'dark' ? 0.32 : 0.22)
-          : alpha(color, t.scheme === 'dark' ? 0.14 : 0.1),
-        borderWidth: 1,
-        borderColor: alpha(color, filled ? 0.5 : 0.22),
+        backgroundColor: solid ? c : alpha(c, t.scheme === 'dark' ? 0.14 : 0.12),
       }}
     >
-      <Text size={size * 0.48}>{emoji}</Text>
+      <Icon
+        name={isIconName(icon) ? icon : 'sparkle'}
+        size={Math.round(size * 0.52)}
+        color={solid ? (t.scheme === 'dark' ? t.onAccent : '#FFFFFF') : c}
+        weight={solid ? 'fill' : 'duotone'}
+      />
     </View>
   );
 }

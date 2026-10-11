@@ -8,8 +8,7 @@ export default function AuthLayout() {
       screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg }, animation: 'slide_from_right' }}
     >
       <Stack.Screen name="welcome" />
-      <Stack.Screen name="sign-in" />
-      <Stack.Screen name="sign-up" />
+      <Stack.Screen name="email" />
       <Stack.Screen name="forgot" />
     </Stack>
   );

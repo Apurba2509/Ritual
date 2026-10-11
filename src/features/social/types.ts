@@ -36,7 +36,6 @@ export interface Activity {
   displayName: string;
   avatar: { emoji: string; color: string; photoUrl?: string | null };
   type: ActivityType;
-  emoji: string;
   text: string;
   createdAt: number;
   kudos: string[];
@@ -57,7 +56,8 @@ export interface Challenge {
   id: string;
   title: string;
   description: string;
-  emoji: string;
+  /** Icon key + tint key, same as habits. */
+  icon: string;
   color: string;
   kind: HabitKind;
   target: number;

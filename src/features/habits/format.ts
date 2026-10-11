@@ -1,4 +1,5 @@
 import type { AutoSource, Habit } from '@/domain/types';
+import type { IconName } from '@/ui/icons';
 
 export function formatAmount(habit: Pick<Habit, 'kind' | 'unit'>, value: number): string {
   if (habit.kind === 'duration') {
@@ -56,6 +57,34 @@ export function autoLabel(auto: AutoSource | null): string | null {
       return 'LeetCode';
     case 'health':
       return auto.metric === 'steps' ? 'Steps' : auto.metric === 'sleep' ? 'Sleep' : 'Workouts';
+    case 'device':
+      return auto.metric === 'steps'
+        ? 'Phone steps'
+        : auto.metric === 'run'
+          ? 'Runs'
+          : auto.metric === 'ride'
+            ? 'Rides'
+            : 'Walks';
+  }
+}
+
+export function autoIcon(auto: AutoSource | null): IconName | null {
+  if (!auto) return null;
+  switch (auto.provider) {
+    case 'github':
+      return 'github-logo';
+    case 'leetcode':
+      return 'code';
+    case 'health':
+      return auto.metric === 'steps' ? 'footprints' : auto.metric === 'sleep' ? 'moon-stars' : 'heartbeat';
+    case 'device':
+      return auto.metric === 'steps'
+        ? 'footprints'
+        : auto.metric === 'run'
+          ? 'person-simple-run'
+          : auto.metric === 'ride'
+            ? 'person-simple-bike'
+            : 'person-simple-walk';
   }
 }
 
@@ -79,10 +108,10 @@ export function timeAgo(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export const MOODS = [
-  { value: 1, emoji: '😞', label: 'Rough' },
-  { value: 2, emoji: '😕', label: 'Meh' },
-  { value: 3, emoji: '🙂', label: 'Okay' },
-  { value: 4, emoji: '😄', label: 'Good' },
-  { value: 5, emoji: '🤩', label: 'Great' },
-] as const;
+export const MOODS: { value: 1 | 2 | 3 | 4 | 5; icon: IconName; label: string }[] = [
+  { value: 1, icon: 'smiley-sad', label: 'Rough' },
+  { value: 2, icon: 'smiley-meh', label: 'Meh' },
+  { value: 3, icon: 'smiley-blank', label: 'Okay' },
+  { value: 4, icon: 'smiley', label: 'Good' },
+  { value: 5, icon: 'smiley-wink', label: 'Great' },
+];

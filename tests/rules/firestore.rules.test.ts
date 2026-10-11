@@ -73,6 +73,22 @@ describe('private user data', () => {
   });
 });
 
+describe('workouts', () => {
+  const workout = { id: 'w1', type: 'run', distanceM: 5200, movingSec: 1800, updatedAt: 1, route: 'abc' };
+
+  it('owners save their own workouts', async () => {
+    await assertSucceeds(setDoc(doc(db('alice'), 'users/alice/workouts/w1'), workout));
+  });
+
+  it('are private and validated', async () => {
+    await seed('users/alice/workouts/w1', workout);
+    await assertFails(getDoc(doc(db('bob'), 'users/alice/workouts/w1')));
+    await assertFails(setDoc(doc(db('alice'), 'users/alice/workouts/w2'), { ...workout, id: 'w2', type: 'teleport' }));
+    await assertFails(setDoc(doc(db('alice'), 'users/alice/workouts/w3'), { ...workout, id: 'w3', distanceM: -5 }));
+    await assertFails(setDoc(doc(db('alice'), 'users/alice/workouts/w4'), { ...workout, id: 'nope' }));
+  });
+});
+
 describe('usernames', () => {
   it('can be checked by anyone but only claimed for yourself', async () => {
     await assertSucceeds(getDoc(doc(db(), 'usernames/alice')));

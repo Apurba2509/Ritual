@@ -16,8 +16,8 @@ vi.mock('expo-crypto', () => ({ randomUUID: () => Math.random().toString(16).sli
 const { useApp } = await import('../store');
 
 const base = {
-  emoji: '🧘',
-  color: '#8B5CF6',
+  icon: 'flower-lotus',
+  color: 'lilac',
   kind: 'check' as const,
   target: 1,
   unit: null,

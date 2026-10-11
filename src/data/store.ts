@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { HABIT_COLORS } from '@/domain/catalog';
+import { habitIconKey, tintKey } from '@/domain/catalog';
 import type { DayKey, WeekStart } from '@/domain/dates';
+import type { NotifyStyle } from '@/domain/notifications';
+import { buildDemoHistory, DEMO_HABITS } from '@/domain/demo';
+import { computeSnapshot } from '@/domain/snapshot';
 import { isEntryDone } from '@/domain/habits';
-import { CategoryId, Entry, entryId, EntrySource, Habit, Mood } from '@/domain/types';
+import { CategoryId, Entry, entryId, EntrySource, Habit, Mood, Workout } from '@/domain/types';
 import { monotonicNow, newId } from '@/lib/ids';
 import { zustandStorage } from '@/lib/storage';
 
@@ -18,17 +21,23 @@ export interface Settings {
   celebrations: boolean;
   morningBrief: { enabled: boolean; time: string };
   eveningNudge: { enabled: boolean; time: string };
+  /** How chatty reminders are (see domain/notifications). */
+  notifyStyle: NotifyStyle;
+  quietHours: { enabled: boolean; start: string; end: string };
+  /** Ping when a habit completes itself from sensors / GitHub / LeetCode while the app is closed. */
+  autoAlerts: boolean;
 }
 
 export interface Profile {
   displayName: string;
   username: string | null;
+  /** `emoji` is legacy (kept for the profile schema); avatars are a photo or initials now. */
   avatar: { emoji: string; color: string; photoUrl?: string | null };
   bio: string | null;
   goals: CategoryId[];
 }
 
-export type OutboxKind = 'habit' | 'entry' | 'user';
+export type OutboxKind = 'habit' | 'entry' | 'workout' | 'user';
 
 export interface OutboxOp {
   kind: OutboxKind;
@@ -55,6 +64,7 @@ export interface EntryChange {
 interface AppState {
   habits: Record<string, Habit>;
   entries: Record<string, Entry>;
+  workouts: Record<string, Workout>;
   unlocked: Record<string, number>;
   lastLevelSeen: number;
   settings: Settings;
@@ -62,11 +72,13 @@ interface AppState {
   onboarded: boolean;
   /** User chose "continue without account". */
   guest: boolean;
+  /** Exploring generated sample data (never synced, cleared before real use). */
+  demo: boolean;
   /** Firebase uid that owns the local data (null = guest/local-only data). */
   ownerUid: string | null;
   outbox: Record<string, OutboxOp>;
   /** Highest server timestamp (ms) pulled per collection. */
-  cursors: { habits: number; entries: number };
+  cursors: { habits: number; entries: number; workouts?: number };
   social: { friends: number; challengesJoined: number };
   integrations: IntegrationState;
   aiLogs: number;
@@ -92,6 +104,11 @@ interface AppState {
   /** Merge values reported by an integration (never lowers a manually logged value). */
   mergeAutoEntries: (habitId: string, values: Record<DayKey, number>, source: EntrySource) => number;
 
+  // workouts
+  /** Add or replace recorded workouts (idempotent by id). Returns how many were new. */
+  saveWorkouts: (list: Workout[]) => number;
+  deleteWorkout: (id: string) => void;
+
   // gamification & profile
   markUnlocked: (ids: string[]) => void;
   setLastLevelSeen: (level: number) => void;
@@ -99,12 +116,15 @@ interface AppState {
   updateProfile: (patch: Partial<Profile>) => void;
   setOnboarded: (v: boolean) => void;
   setGuest: (v: boolean) => void;
+  loadDemo: (today: DayKey) => void;
+  /** Throw away sample data and start fresh (keeps settings). */
+  exitDemo: () => void;
   setSocialCounts: (patch: Partial<AppState['social']>) => void;
   setIntegration: <K extends keyof IntegrationState>(key: K, value: IntegrationState[K]) => void;
   bumpAiLogs: () => void;
 
   // sync plumbing
-  applyRemote: (kind: 'habit' | 'entry', docs: (Habit | Entry)[], cursor: number) => void;
+  applyRemote: (kind: 'habit' | 'entry' | 'workout', docs: (Habit | Entry | Workout)[], cursor: number) => void;
   applyRemoteUser: (doc: RemoteUserDoc) => void;
   ackOutbox: (acked: OutboxOp[]) => void;
   adoptLocalData: (uid: string) => void;
@@ -128,15 +148,24 @@ export const DEFAULT_SETTINGS: Settings = {
   celebrations: true,
   morningBrief: { enabled: true, time: '08:00' },
   eveningNudge: { enabled: true, time: '20:30' },
+  notifyStyle: 'coach',
+  quietHours: { enabled: true, start: '22:30', end: '07:30' },
+  autoAlerts: true,
 };
 
 export const DEFAULT_PROFILE: Profile = {
   displayName: '',
   username: null,
-  avatar: { emoji: '🔥', color: HABIT_COLORS[0] },
+  avatar: { emoji: '', color: 'lime', photoUrl: null },
   bio: null,
   goals: [],
 };
+
+/** Upgrade habits written by older versions (emoji icons, hex colours) to the current shape. */
+export function normalizeHabit(raw: Habit & { emoji?: string }): Habit {
+  const { emoji, ...rest } = raw;
+  return { ...rest, icon: habitIconKey({ icon: raw.icon, emoji }), color: tintKey(raw.color) };
+}
 
 const EMPTY_INTEGRATIONS: IntegrationState = { github: null, leetcode: null, health: null };
 
@@ -209,15 +238,17 @@ export const useApp = create<AppState>()(
       return {
         habits: {},
         entries: {},
+        workouts: {},
         unlocked: {},
         lastLevelSeen: 1,
         settings: DEFAULT_SETTINGS,
         profile: DEFAULT_PROFILE,
         onboarded: false,
         guest: false,
+        demo: false,
         ownerUid: null,
         outbox: {},
-        cursors: { habits: 0, entries: 0 },
+        cursors: { habits: 0, entries: 0, workouts: 0 },
         social: { friends: 0, challengesJoined: 0 },
         integrations: EMPTY_INTEGRATIONS,
         aiLogs: 0,
@@ -322,6 +353,32 @@ export const useApp = create<AppState>()(
           return changed;
         },
 
+        // ── workouts ──
+        saveWorkouts: (list) => {
+          let added = 0;
+          set((s) => {
+            const workouts = { ...s.workouts };
+            let outbox = s.outbox;
+            for (const w of list) {
+              if (!workouts[w.id]) added++;
+              const next = { ...w, updatedAt: Math.max(monotonicNow(), (workouts[w.id]?.updatedAt ?? 0) + 1) };
+              workouts[w.id] = next;
+              outbox = enqueue(outbox, 'workout', w.id, next.updatedAt);
+            }
+            return { workouts, outbox };
+          });
+          return added;
+        },
+        deleteWorkout: (id) => {
+          const prev = get().workouts[id];
+          if (!prev) return;
+          const updatedAt = Math.max(monotonicNow(), prev.updatedAt + 1);
+          set((s) => ({
+            workouts: { ...s.workouts, [id]: { ...prev, deleted: true, updatedAt } },
+            outbox: enqueue(s.outbox, 'workout', id, updatedAt),
+          }));
+        },
+
         // ── gamification / profile ──
         markUnlocked: (ids) => {
           if (!ids.length) return;
@@ -347,6 +404,46 @@ export const useApp = create<AppState>()(
           touchUser();
         },
         setGuest: (guest) => set({ guest }),
+        loadDemo: (today) => {
+          const { habits, entries } = buildDemoHistory({ idPrefix: 'demo', specs: DEMO_HABITS, today, days: 180 });
+          // Pre-mark what the history already earned so loading it doesn't fire a storm of celebrations.
+          const snap = computeSnapshot({
+            habits,
+            entries,
+            today,
+            weekStart: get().settings.weekStart,
+            unlocked: {},
+            friends: 0,
+            challengesJoined: 0,
+          });
+          const now = Date.now();
+          set({
+            habits: Object.fromEntries(habits.map((h) => [h.id, h])),
+            entries: Object.fromEntries(entries.map((e) => [e.id, e])),
+            unlocked: Object.fromEntries(snap.newlyUnlocked.map((id) => [id, now])),
+            lastLevelSeen: snap.level.level,
+            profile: { ...DEFAULT_PROFILE, displayName: 'Alex' },
+            onboarded: true,
+            guest: true,
+            demo: true,
+            ownerUid: null,
+            outbox: {},
+            aiLogs: 0,
+          });
+        },
+        exitDemo: () =>
+          set((s) => ({
+            habits: {},
+            entries: {},
+            workouts: {},
+            unlocked: {},
+            lastLevelSeen: 1,
+            profile: DEFAULT_PROFILE,
+            demo: false,
+            outbox: {},
+            aiLogs: 0,
+            settings: s.settings,
+          })),
         setSocialCounts: (patch) => set((s) => ({ social: { ...s.social, ...patch } })),
         setIntegration: (key, value) => {
           const prev = get().integrations[key] as { username?: string } | null;
@@ -359,24 +456,18 @@ export const useApp = create<AppState>()(
         // ── sync plumbing ──
         applyRemote: (kind, docs, cursor) => {
           set((s) => {
-            const coll: Record<string, Habit | Entry> = kind === 'habit' ? { ...s.habits } : { ...s.entries };
+            const key = kind === 'habit' ? 'habits' : kind === 'entry' ? 'entries' : 'workouts';
+            const coll: Record<string, Habit | Entry | Workout> = { ...s[key] };
             const outbox = { ...s.outbox };
-            for (const doc of docs) {
-              const local = coll[doc.id];
-              if (local && local.updatedAt >= doc.updatedAt) continue; // local is newer or equal
+            for (const raw of docs) {
+              const local = coll[raw.id];
+              if (local && local.updatedAt >= raw.updatedAt) continue; // local is newer or equal
+              const doc = kind === 'habit' ? normalizeHabit(raw as Habit) : raw;
               coll[doc.id] = doc;
               delete outbox[opKey(kind, doc.id)]; // remote won last-write-wins
             }
-            const cursors = {
-              ...s.cursors,
-              [kind === 'habit' ? 'habits' : 'entries']: Math.max(
-                cursor,
-                s.cursors[kind === 'habit' ? 'habits' : 'entries'],
-              ),
-            };
-            return kind === 'habit'
-              ? { habits: coll as Record<string, Habit>, outbox, cursors }
-              : { entries: coll as Record<string, Entry>, outbox, cursors };
+            const cursors = { ...s.cursors, [key]: Math.max(cursor, s.cursors[key] ?? 0) };
+            return { [key]: coll, outbox, cursors } as Partial<AppState>;
           });
         },
 
@@ -393,7 +484,7 @@ export const useApp = create<AppState>()(
               integrations.leetcode = { username: doc.integrations.leetcode, lastSyncAt: null, error: null };
             return {
               profile: doc.profile ? { ...DEFAULT_PROFILE, ...doc.profile } : s.profile,
-              settings: doc.settings ? { ...s.settings, ...doc.settings } : s.settings,
+              settings: doc.settings ? { ...DEFAULT_SETTINGS, ...s.settings, ...doc.settings } : s.settings,
               onboarded: s.onboarded || !!doc.onboarded,
               unlocked: { ...doc.unlocked, ...s.unlocked },
               integrations,
@@ -417,8 +508,9 @@ export const useApp = create<AppState>()(
             let outbox = { ...s.outbox };
             for (const h of Object.values(s.habits)) outbox = enqueue(outbox, 'habit', h.id, h.updatedAt);
             for (const e of Object.values(s.entries)) outbox = enqueue(outbox, 'entry', e.id, e.updatedAt);
+            for (const w of Object.values(s.workouts)) outbox = enqueue(outbox, 'workout', w.id, w.updatedAt);
             outbox = enqueue(outbox, 'user', 'me', monotonicNow());
-            return { ownerUid: uid, guest: false, outbox };
+            return { ownerUid: uid, guest: false, demo: false, outbox };
           });
         },
 
@@ -426,14 +518,16 @@ export const useApp = create<AppState>()(
           set((s) => ({
             habits: {},
             entries: {},
+            workouts: {},
             unlocked: {},
             lastLevelSeen: 1,
             profile: DEFAULT_PROFILE,
             onboarded: false,
             guest: false,
+            demo: false,
             ownerUid: uid,
             outbox: {},
-            cursors: { habits: 0, entries: 0 },
+            cursors: { habits: 0, entries: 0, workouts: 0 },
             social: { friends: 0, challengesJoined: 0 },
             integrations: EMPTY_INTEGRATIONS,
             aiLogs: 0,
@@ -443,17 +537,32 @@ export const useApp = create<AppState>()(
     },
     {
       name: 'ritual-app',
-      version: 1,
+      version: 3,
       storage: createJSONStorage(() => zustandStorage),
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<AppState>;
+        if (version < 2 && state.habits) {
+          // 2.0 → 2.1: emoji icons became icon keys, hex colours became tint keys.
+          state.habits = Object.fromEntries(
+            Object.entries(state.habits).map(([id, h]) => [id, normalizeHabit(h as Habit & { emoji?: string })]),
+          );
+          if (state.profile) state.profile = { ...state.profile, avatar: { ...state.profile.avatar, emoji: '' } };
+        }
+        // New settings get their defaults without touching the ones people already chose.
+        state.settings = { ...DEFAULT_SETTINGS, ...(state.settings ?? {}) };
+        return state as AppState;
+      },
       partialize: ({
         habits,
         entries,
+        workouts,
         unlocked,
         lastLevelSeen,
         settings,
         profile,
         onboarded,
         guest,
+        demo,
         ownerUid,
         outbox,
         cursors,
@@ -463,12 +572,14 @@ export const useApp = create<AppState>()(
       }) => ({
         habits,
         entries,
+        workouts,
         unlocked,
         lastLevelSeen,
         settings,
         profile,
         onboarded,
         guest,
+        demo,
         ownerUid,
         outbox,
         cursors,

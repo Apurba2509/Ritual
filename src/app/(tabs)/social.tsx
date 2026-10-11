@@ -11,6 +11,7 @@ import { isFirebaseConfigured } from '@/lib/firebase';
 import { Button, IconButton } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { EmptyState } from '@/ui/EmptyState';
+import { Icon } from '@/ui/Icon';
 import { Screen, Section } from '@/ui/Screen';
 import { Segmented } from '@/ui/Segmented';
 import { Text } from '@/ui/Text';
@@ -20,17 +21,18 @@ type Tab = 'feed' | 'ranks' | 'challenges';
 
 function GuestCTA() {
   return (
-    <Screen title="Social" bottomInset={110}>
+    <Screen title="Friends" bottomInset={110}>
       <EmptyState
-        emoji="🤝"
+        icon="users-three"
         title="Better together"
         body={
           isFirebaseConfigured
-            ? 'Create a free account to add friends, cheer their wins with kudos, climb weekly leaderboards and join challenges. Your guest data comes with you.'
+            ? 'Add friends, cheer their wins with kudos, climb weekly leaderboards and join challenges. Free account, one tap with Google.'
             : 'Social features need cloud sync, which isn’t configured in this build.'
         }
-        action={isFirebaseConfigured ? 'Create account' : undefined}
-        onAction={() => router.push('/account')}
+        action={isFirebaseConfigured ? 'Create free account' : undefined}
+        actionIcon="arrow-right"
+        onAction={() => router.push('/upgrade')}
       />
     </Screen>
   );
@@ -85,13 +87,13 @@ function Leaderboards() {
           />
         </View>
       </View>
-      <Card padded={false} style={{ padding: 6 }}>
+      <Card padded={false} style={{ overflow: 'hidden' }}>
         {error ? (
           <Text variant="caption" tone="danger" style={{ padding: 12 }}>
             {error}
           </Text>
         ) : list.length === 0 ? (
-          <Text tone="muted" align="center" style={{ padding: 18 }}>
+          <Text tone="muted" align="center" style={{ padding: 22 }}>
             {scope === 'global' && !global ? 'Loading…' : 'No one here yet.'}
           </Text>
         ) : (
@@ -103,6 +105,7 @@ function Leaderboards() {
               me={p.uid === uid}
               value={period === 'week' ? p.weeklyXP : p.xp}
               label={period === 'week' ? 'XP this week' : 'XP'}
+              last={i === list.length - 1}
             />
           ))
         )}
@@ -156,11 +159,12 @@ function Challenges() {
           Loading challenges…
         </Text>
       ) : items.length === 0 ? (
-        <Card tone="outline">
-          <Text tone="muted" align="center">
-            No public challenges yet. Start the first one — your friends can join with a link.
-          </Text>
-        </Card>
+        <EmptyState
+          icon="flag"
+          compact
+          title="No challenges yet"
+          body="Start the first one. Friends can join from here or with a link."
+        />
       ) : (
         items.map((c) => <ChallengeCard key={c.id} c={c} joined={joined.has(c.id)} />)
       )}
@@ -169,6 +173,7 @@ function Challenges() {
 }
 
 export default function SocialScreen() {
+  const t = useTheme();
   const user = useSession((s) => s.user);
   const feed = useSocial((s) => s.feed);
   const friendships = useSocial((s) => s.friendships);
@@ -182,7 +187,7 @@ export default function SocialScreen() {
 
   return (
     <Screen
-      title="Social"
+      title="Friends"
       bottomInset={110}
       right={
         <IconButton
@@ -200,6 +205,7 @@ export default function SocialScreen() {
             await refreshProfiles();
             setRefreshing(false);
           }}
+          tintColor={t.text}
         />
       }
     >
@@ -217,28 +223,30 @@ export default function SocialScreen() {
         <Section>
           {incoming > 0 ? (
             <Card
+              tone="accent"
               onPress={() => router.push('/friends')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
             >
-              <Text size={22}>👋</Text>
-              <Text variant="bodyStrong" style={{ flex: 1 }}>
+              <Icon name="hand-waving" size={22} color={t.onAccent} weight="fill" />
+              <Text variant="bodyStrong" color={t.onAccent} style={{ flex: 1 }}>
                 {incoming} friend request{incoming > 1 ? 's' : ''}
               </Text>
-              <Text variant="caption" tone="accent">
+              <Text variant="caption" weight="bold" color={t.onAccent}>
                 Review
               </Text>
             </Card>
           ) : null}
           {feed.length === 0 ? (
             <EmptyState
-              emoji="📣"
+              icon="hands-clapping"
               title={friends ? 'Quiet for now' : 'Your feed is empty'}
               body={
                 friends
                   ? 'Milestones, badges and level-ups from you and your friends show up here.'
-                  : 'Add friends by username. Their streak milestones, badges and level-ups show up here — send 🔥 kudos.'
+                  : 'Add friends by username. Their streak milestones, badges and level-ups show up here for kudos.'
               }
               action={friends ? undefined : 'Find friends'}
+              actionIcon="user-plus"
               onAction={() => router.push('/friends')}
             />
           ) : (
