@@ -8,10 +8,16 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
-/** Wakes up every ~15 minutes (even with the app closed) to snapshot the step counter. */
+/**
+ * Wakes up every ~15 minutes (even with the app closed) to snapshot the step counter, and once a
+ * day to cache finished screen-time days. Both are cheap reads of data the OS already keeps, so a
+ * worker that an aggressive battery manager delays only catches up later; nothing is lost.
+ */
 class StepWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
   override suspend fun doWork(): Result {
-    Sensors.snapshot(applicationContext)
+    val ctx = applicationContext
+    if (StepLedger.prefs(ctx).getBoolean(BootReceiver.KEY_STEPS_ENABLED, false)) Sensors.snapshot(ctx)
+    runCatching { ScreenTime.cacheFinishedDays(ctx) }
     return Result.success()
   }
 

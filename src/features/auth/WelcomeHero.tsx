@@ -76,7 +76,7 @@ function HeroCard({ item, index, done }: { item: HeroItem; index: number; done: 
 
   useEffect(() => {
     if (done && !item.done) {
-      pop.value = withSequence(withTiming(0.7, { duration: 90 }), withSpring(1, { damping: 7, stiffness: 260 }));
+      pop.value = withSequence(withTiming(0.7, { duration: 90 }), withSpring(1, { damping: 13, stiffness: 260 }));
     }
   }, [done, item.done, pop]);
 

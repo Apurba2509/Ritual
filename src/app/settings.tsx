@@ -235,6 +235,26 @@ export default function SettingsScreen() {
           )}
         </Section>
 
+        {Platform.OS === 'android' ? (
+          <Section title="Phone">
+            <ListGroup>
+              <ListRow
+                icon="hourglass-high"
+                title="Screen time & mindful pause"
+                subtitle="See where your time goes, add a breath before apps that pull you in"
+                onPress={() => router.push('/screen-time')}
+              />
+              <ListRow
+                icon="battery-charging"
+                title="Keep Ritual running"
+                subtitle="Battery settings for reliable background tracking"
+                onPress={() => router.push('/reliability')}
+                last
+              />
+            </ListGroup>
+          </Section>
+        ) : null}
+
         {widgetSupported ? (
           <Section title="Home screen">
             <ListGroup>

@@ -15,7 +15,21 @@ import type { CategoryId, EntryIndex, Habit } from './types';
 
 export type NotifyStyle = 'calm' | 'balanced' | 'coach';
 
-export type PlannedKind = 'reminder' | 'nudge' | 'brief' | 'midday' | 'movement' | 'evening' | 'lastcall' | 'weekly';
+export type PlannedKind =
+  'reminder' | 'nudge' | 'brief' | 'midday' | 'movement' | 'evening' | 'lastcall' | 'weekly' | 'rescue';
+
+/** What the behaviour engine knows about this person (see domain/behavior). */
+export interface PersonalSignals {
+  /** Learned time each habit usually gets done ("HH:mm"). */
+  usualTime: Map<string, string>;
+  /** Habits that were missed yesterday (never-miss-twice). */
+  missedYesterday: Set<string>;
+  /** Two-minute version of each habit. */
+  tiny: Map<string, string>;
+  mood: 'new' | 'thriving' | 'steady' | 'slipping' | 'struggling' | 'returning';
+  /** Easy mode is on today: tiny versions count. */
+  easy: boolean;
+}
 
 export interface PlannedNotification {
   id: string;
@@ -41,6 +55,7 @@ export interface PlannerInput {
   /** Steps counted so far today, if the phone is tracking them. */
   stepsToday?: number | null;
   days?: number;
+  personal?: PersonalSignals;
 }
 
 /** Sensible time of day to nudge a habit that has no reminder set, by what kind of habit it is. */
@@ -59,6 +74,7 @@ const SMART_TIME: Record<CategoryId, string> = {
 
 const PRIORITY: Record<PlannedKind, number> = {
   reminder: 9,
+  rescue: 8,
   lastcall: 8,
   evening: 7,
   movement: 6,
@@ -138,8 +154,11 @@ const list = (hs: Habit[]) =>
 export function planNotifications(input: PlannerInput): PlannedNotification[] {
   const { habits, index, streaks, today, now, weekStart, style } = input;
   const days = input.days ?? 7;
-  const coach = style === 'coach';
-  const balanced = style !== 'calm';
+  const personal = input.personal;
+  // When someone is struggling, more pings make it worse. Fewer, kinder ones.
+  const gentle = personal?.mood === 'struggling' || personal?.mood === 'returning';
+  const coach = style === 'coach' && !gentle;
+  const balanced = style !== 'calm' && !gentle;
   const out: PlannedNotification[] = [];
   const push = (n: Omit<PlannedNotification, 'at'> & { at: Date }, allowInQuiet = false) => {
     if (n.at.getTime() <= now + 30_000) return;
@@ -165,8 +184,18 @@ export function planNotifications(input: PlannerInput): PlannedNotification[] {
         kind: 'brief',
         day,
         at: at(day, input.morningBrief.time),
-        title: pick(['Your ritual for today', 'Good morning', 'Today’s lineup'], seed),
-        body: `${due.length} habit${due.length > 1 ? 's' : ''}: ${list(due)}`,
+        title:
+          isToday && personal?.mood === 'returning'
+            ? 'A fresh start'
+            : isToday && personal?.easy
+              ? 'Easy mode today'
+              : pick(['Your ritual for today', 'Good morning', 'Today’s lineup'], seed),
+        body:
+          isToday && personal?.mood === 'returning'
+            ? `No catching up needed. Just one tiny thing today: ${(personal.tiny.get(due[0].id) ?? due[0].name).toLowerCase()}.`
+            : isToday && personal?.easy
+              ? `Tiny versions count today. ${list(due)}.`
+              : `${due.length} habit${due.length > 1 ? 's' : ''}: ${list(due)}`,
       });
     }
 
@@ -184,7 +213,10 @@ export function planNotifications(input: PlannerInput): PlannedNotification[] {
             habitId: h.id,
             at: at(day, time),
             title: h.name,
-            body: reminderCopy(h, streak, seed + h.name.length),
+            body:
+              isToday && personal?.easy && personal.tiny.get(h.id)
+                ? `Easy mode: ${personal.tiny.get(h.id)!.toLowerCase()} counts today.`
+                : reminderCopy(h, streak, seed + h.name.length),
           },
           true,
         );
@@ -195,7 +227,7 @@ export function planNotifications(input: PlannerInput): PlannedNotification[] {
     if (coach) {
       for (const h of open) {
         if (h.reminders.length || h.auto) continue;
-        const time = (h.category && SMART_TIME[h.category]) || '12:30';
+        const time = personal?.usualTime.get(h.id) ?? ((h.category && SMART_TIME[h.category]) || '12:30');
         push({
           id: `nudge:${h.id}:${day}`,
           kind: 'nudge',
@@ -204,6 +236,25 @@ export function planNotifications(input: PlannerInput): PlannedNotification[] {
           at: at(day, time),
           title: h.name,
           body: nudgeCopy(h, seed + h.name.length),
+        });
+      }
+    }
+
+    // Never miss twice: one kind nudge with the two-minute version, at the time they usually do it.
+    if (isToday && personal) {
+      const missed = open.find((h) => personal.missedYesterday.has(h.id) && !h.auto);
+      if (missed) {
+        const tiny = personal.tiny.get(missed.id);
+        push({
+          id: `rescue:${missed.id}:${day}`,
+          kind: 'rescue',
+          day,
+          habitId: missed.id,
+          at: at(day, personal.usualTime.get(missed.id) ?? '18:00'),
+          title: `Don't miss ${missed.name.toLowerCase()} twice`,
+          body: tiny
+            ? `Yesterday slipped. That's fine. Today the tiny version counts: ${tiny.toLowerCase()}.`
+            : 'Yesterday slipped. That’s fine. Two minutes today keeps the habit alive.',
         });
       }
     }

@@ -1,8 +1,8 @@
 import { AppState } from 'react-native';
 import type { DayKey } from '@/domain/dates';
-import { isScheduledOn } from '@/domain/habits';
+import { isEntryDone, isScheduledOn } from '@/domain/habits';
 import type { EntrySource } from '@/domain/types';
-import { milestoneBonus } from '@/domain/xp';
+import { LUCKY_XP, luckyBonus, milestoneBonus } from '@/domain/xp';
 import { getSnapshot, useClock } from '@/data/hooks';
 import { EntryChange, useApp } from '@/data/store';
 import { useUI } from '@/data/ui';
@@ -45,6 +45,10 @@ function afterChange(habitId: string, day: DayKey, change: EntryChange | null, o
         type: 'milestone',
         text: `hit a ${current}-${unit} streak on ${stats.habit.name}`,
       });
+    }
+    // Variable reward, announced the moment it happens (milestones already have their own moment).
+    if (!bonus && !opts.quiet && luckyBonus(change.entry.id) > 0) {
+      ui.toast(`Lucky bonus · +${LUCKY_XP} XP`, { icon: 'sparkle', tone: 'success' });
     }
     const todaySummary = snap.days.get(today);
     // Only a *required* habit can complete the day; finishing a bonus habit afterwards shouldn't re-announce it.
@@ -92,11 +96,43 @@ export function completeHabit(habitId: string, day: DayKey, source: EntrySource)
   return setProgress(habitId, day, value, source);
 }
 
+/** The two-minute version: counts as done today, keeps the streak, earns half XP. */
+export function logTinyHabit(habitId: string, day: DayKey) {
+  const change = useApp.getState().logTiny(habitId, day);
+  afterChange(habitId, day, change);
+  if (change?.isDone && !change.wasDone) {
+    useUI.getState().toast('Tiny version done. Streak safe.', { icon: 'plant', tone: 'success' });
+  }
+  return change;
+}
+
 export function skipHabit(habitId: string, day: DayKey, skipped: boolean) {
   const change = useApp.getState().setEntry(habitId, day, { skipped, value: 0 });
   rescheduleSoon();
   haptic.light();
   return change;
+}
+
+/**
+ * Screen-limit habits: exact values (held = 1, over = 0). Holding the line is quiet; going over
+ * today is worth knowing about, gently.
+ */
+export function applyScreenValues(habitId: string, values: Record<DayKey, number>) {
+  const today = useClock.getState().today;
+  const h = useApp.getState().habits[habitId];
+  if (!h) return 0;
+  const before = useApp.getState().entries[`${habitId}_${today}`];
+  const changed = useApp.getState().setAutoEntries(habitId, values, 'screen');
+  if (changed) {
+    rescheduleSoon();
+    const after = useApp.getState().entries[`${habitId}_${today}`];
+    if (isEntryDone(h, before) && !isEntryDone(h, after)) {
+      const msg = `You went past your limit for ${h.name.toLowerCase()} today. Tomorrow is a fresh day.`;
+      if (AppState.currentState === 'active') useUI.getState().toast(msg, { icon: 'hourglass-high' });
+      else notifyAutoComplete(h, msg, { title: 'Screen time' }).catch(() => {});
+    }
+  }
+  return changed;
 }
 
 /** Apply integration data quietly (no confetti storms for a year of backfill). */
@@ -109,8 +145,8 @@ export function applyAutoValues(habitId: string, values: Record<DayKey, number>,
     const todayAfter = useApp.getState().entries[`${habitId}_${today}`];
     if (todayAfter && todayAfter !== todayBefore) {
       const h = useApp.getState().habits[habitId];
-      const wasDone = !!todayBefore && !todayBefore.deleted && todayBefore.value >= (h?.target ?? 1);
-      const isDone = !todayAfter.deleted && todayAfter.value >= (h?.target ?? 1);
+      const wasDone = !!h && isEntryDone(h, todayBefore);
+      const isDone = !!h && isEntryDone(h, todayAfter);
       afterChange(habitId, today, { wasDone, isDone, entry: todayAfter }, { quiet: true });
       // Completed itself while you weren't looking: tell you (in the app it shows as a toast instead).
       if (h && isDone && !wasDone) {

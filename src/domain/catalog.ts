@@ -1,4 +1,4 @@
-import type { AutoSource, CategoryId, DeviceMetric, Difficulty, HabitKind, Schedule } from './types';
+import type { AutoSource, CategoryId, DeviceMetric, Difficulty, HabitKind, Schedule, ScreenScope } from './types';
 
 /** Habit colour keys. Display values per theme live in ui/theme (HABIT_TINTS). */
 export const HABIT_TINT_KEYS = ['lime', 'sky', 'mint', 'lilac', 'rose', 'coral', 'peach', 'butter', 'slate'] as const;
@@ -44,6 +44,8 @@ export interface HabitTemplate {
   autoMetric?: 'steps' | 'exercise' | 'sleep';
   /** Measured by the phone itself (step counter / activity recognition / workout recorder). */
   deviceMetric?: DeviceMetric;
+  /** Screen-time limit measured from Android's usage log. */
+  screen?: { scope: ScreenScope; limitMin: number };
 }
 
 const daily: Schedule = { type: 'daily' };
@@ -234,6 +236,34 @@ export const TEMPLATES: HabitTemplate[] = [
     unit: null,
     schedule: daily,
     difficulty: 'hard',
+  },
+  {
+    id: 'screen_cap',
+    name: 'Screen time under 3h',
+    icon: 'hourglass-high',
+    color: 'slate',
+    category: 'productivity',
+    kind: 'check',
+    target: 1,
+    unit: null,
+    schedule: daily,
+    difficulty: 'medium',
+    autoHint: 'screen',
+    screen: { scope: 'all', limitMin: 180 },
+  },
+  {
+    id: 'social_cap',
+    name: 'Social apps under 45 min',
+    icon: 'device-mobile-slash',
+    color: 'rose',
+    category: 'productivity',
+    kind: 'check',
+    target: 1,
+    unit: null,
+    schedule: daily,
+    difficulty: 'hard',
+    autoHint: 'screen',
+    screen: { scope: 'guarded', limitMin: 45 },
   },
   {
     id: 'deep_work',

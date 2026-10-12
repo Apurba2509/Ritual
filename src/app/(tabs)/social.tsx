@@ -39,7 +39,6 @@ function GuestCTA() {
 }
 
 function Leaderboards() {
-  const t = useTheme();
   const uid = useSession((s) => s.user?.uid)!;
   const friendships = useSocial((s) => s.friendships);
   const profiles = useSocial((s) => s.profiles);

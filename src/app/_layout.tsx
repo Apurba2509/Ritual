@@ -154,6 +154,8 @@ export default function RootLayout() {
               />
               <Stack.Screen name="activity/index" />
               <Stack.Screen name="activity/[id]" />
+              <Stack.Screen name="screen-time" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="reliability" />
             </Stack.Protected>
             <Stack.Protected guard={status === 'signedOut'}>
               <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />

@@ -138,7 +138,7 @@ export function CelebrationHost() {
       return;
     }
     haptic.heavy();
-    pulse.value = withSequence(withTiming(1.06, { duration: 140 }), withSpring(1, { damping: 6, stiffness: 160 }));
+    pulse.value = withSequence(withTiming(1.06, { duration: 140 }), withSpring(1, { damping: 11, stiffness: 160 }));
   }, [current, enabled, shift, pulse]);
 
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));

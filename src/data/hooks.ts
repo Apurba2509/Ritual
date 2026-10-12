@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 import { create } from 'zustand';
 import { DayKey, todayKey } from '@/domain/dates';
 import { isDueOn } from '@/domain/habits';
+import { analyzeAll } from '@/domain/behavior';
+import { CoachCard, coachCards } from '@/domain/coach';
 import { computeSnapshot, Snapshot } from '@/domain/snapshot';
 import type { Entry, Habit } from '@/domain/types';
 import { useApp } from './store';
@@ -111,4 +113,55 @@ export function useDayList(day: DayKey): DayItem[] {
       }),
     [habits, snapshot, day, weekStart],
   );
+}
+
+// ─── Behaviour engine (patterns, coach) ──────────────────────────────────────
+
+let behaviorCache: { snap: Snapshot; value: ReturnType<typeof analyzeAll> } | null = null;
+
+/** Habit patterns + the person's overall state, recomputed only when history changes. */
+export function getBehavior(snap: Snapshot = getSnapshot()) {
+  if (behaviorCache?.snap === snap) return behaviorCache.value;
+  const s = useApp.getState();
+  const value = analyzeAll(Object.values(s.habits), snap.index, snap.today, s.settings.weekStart, Date.now());
+  behaviorCache = { snap, value };
+  return value;
+}
+
+export function useBehavior() {
+  const snap = useSnapshot();
+  return useMemo(() => getBehavior(snap), [snap]);
+}
+
+/** The coach's suggestions for right now, most important first. */
+export function useCoachCards(): CoachCard[] {
+  const snap = useSnapshot();
+  const behavior = useBehavior();
+  const easyUntil = useApp((s) => s.easyUntil);
+  const dismissed = useApp((s) => s.coachDismissed);
+  const weekStart = useApp((s) => s.settings.weekStart);
+  // Read the clock once per mount (render stays pure); cards recompute whenever history changes.
+  const [now] = useState(() => Date.now());
+  return useMemo(
+    () =>
+      coachCards({
+        habits: [...snap.habitStats.values()].map((h) => h.habit),
+        index: snap.index,
+        patterns: behavior.patterns,
+        user: behavior.user,
+        streaks: new Map([...snap.habitStats].map(([id, st]) => [id, st.streak.current])),
+        today: snap.today,
+        now,
+        weekStart,
+        easyUntil,
+        dismissed,
+      }),
+    [snap, behavior, easyUntil, dismissed, weekStart, now],
+  );
+}
+
+export function useEasyMode(): boolean {
+  const today = useToday();
+  const easyUntil = useApp((s) => s.easyUntil);
+  return !!easyUntil && easyUntil >= today;
 }

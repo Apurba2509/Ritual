@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHabit, useToday } from '@/data/hooks';
 import { useApp } from '@/data/store';
 import { useUI } from '@/data/ui';
-import { addProgress } from '@/features/habits/actions';
+import { addProgress, completeHabit, logTinyHabit } from '@/features/habits/actions';
 import { formatAmount } from '@/features/habits/format';
 import { HabitIcon } from '@/features/habits/HabitIcon';
 import { cancelNotification, scheduleAt } from '@/features/notifications/scheduler';
@@ -42,12 +42,16 @@ function KeepAwake() {
 export default function FocusScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, minutes: preset } = useLocalSearchParams<{ id: string; minutes?: string }>();
   const habit = useHabit(id);
   const today = useToday();
   const logged = useApp((s) => (habit ? (s.entries[`${habit.id}_${today}`]?.value ?? 0) : 0));
   const remainingTarget = habit ? Math.max(5, Math.round(habit.target - logged)) : 25;
-  const [minutes, setMinutes] = useState(remainingTarget);
+  // "Just start": a two-minute timer lowers the bar to begin; most people keep going.
+  const presetMin = preset ? Math.max(1, Math.min(180, Number(preset) || 2)) : null;
+  const [minutes, setMinutes] = useState(presetMin ?? remainingTarget);
+  // Only time-based habits log minutes; for others the timer is a starting ramp.
+  const logsTime = habit?.kind === 'duration';
   const [phase, setPhase] = useState<Phase>('setup');
   // Timestamps, not a ticking counter — accurate even if the app is backgrounded.
   const [startedAt, setStartedAt] = useState(0);
@@ -84,7 +88,7 @@ export default function FocusScreen() {
     cancelNotification(NOTIF_ID);
     const mins = Math.round(elapsedMs / 60_000);
     setPhase('done');
-    if (mins >= 1) {
+    if (mins >= 1 && logsTime) {
       addProgress(habit.id, today, mins, 'timer');
       if (completed) {
         haptic.success();
@@ -174,8 +178,12 @@ export default function FocusScreen() {
                   : phase === 'paused'
                     ? 'Paused'
                     : phase === 'done'
-                      ? `${minutesDone} min logged`
-                      : 'Stay with it'}
+                      ? logsTime
+                        ? `${minutesDone} min logged`
+                        : 'You started. That was the hard part.'
+                      : presetMin && presetMin <= 5
+                        ? 'Just start. Keep going if you like'
+                        : 'Stay with it'}
               </Text>
             </ProgressRing>
           </View>
@@ -186,7 +194,7 @@ export default function FocusScreen() {
             entering={FadeIn}
             style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}
           >
-            {[...new Set([5, 10, 15, 25, 45, 60, remainingTarget])]
+            {[...new Set([...(presetMin ? [presetMin] : []), 5, 10, 15, 25, 45, 60, remainingTarget])]
               .sort((a, b) => a - b)
               .map((m) => (
                 <Chip key={m} label={`${m} min`} selected={minutes === m} onPress={() => setMinutes(m)} />
@@ -217,7 +225,32 @@ export default function FocusScreen() {
             />
           </View>
         ) : null}
-        {phase === 'done' ? <Button title="Done" size="lg" full onPress={close} /> : null}
+        {phase === 'done' && logsTime ? <Button title="Done" size="lg" full onPress={close} /> : null}
+        {phase === 'done' && !logsTime ? (
+          <View style={{ gap: 10 }}>
+            <Button
+              title="I finished it"
+              icon="check"
+              size="lg"
+              full
+              onPress={() => {
+                completeHabit(habit.id, today, 'timer');
+                close();
+              }}
+            />
+            <Button
+              title="Count the tiny version"
+              icon="plant"
+              variant="secondary"
+              size="lg"
+              full
+              onPress={() => {
+                logTinyHabit(habit.id, today);
+                close();
+              }}
+            />
+          </View>
+        ) : null}
       </View>
     </View>
   );

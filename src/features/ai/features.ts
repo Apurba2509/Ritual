@@ -1,4 +1,5 @@
 import { Schema } from 'firebase/ai';
+import { niceAmount } from '@/domain/behavior';
 import { HABIT_TINT_KEYS, ICON_GROUPS } from '@/domain/catalog';
 import { scheduleLabel, targetLabel } from '@/domain/habits';
 import { localInsights } from '@/domain/insights';
@@ -102,6 +103,12 @@ export interface CoachHabit {
   reminder: string | null;
   why: string;
   color: string;
+  /** Where the ladder ends; `target` is the first rung. */
+  goalTarget: number | null;
+  /** Two-minute version for hard days. */
+  tiny: string | null;
+  /** Implementation intention: "After my morning coffee". */
+  cue: string | null;
 }
 
 export interface CoachPlan {
@@ -123,7 +130,19 @@ const coachSchema = Schema.object({
           name: Schema.string({ description: 'concise habit name, max 4 words, starts with a verb' }),
           icon: Schema.enumString({ enum: HABIT_ICONS, description: 'the icon that best depicts the habit' }),
           kind: Schema.enumString({ enum: ['check', 'count', 'duration'] }),
-          target: Schema.number({ description: '1 for check; N for count; minutes for duration' }),
+          target: Schema.number({
+            description: 'the FINAL goal: 1 for check; N for count; minutes for duration',
+          }),
+          start: Schema.number({
+            description:
+              'where to START (week 1) — deliberately small, roughly 30-50% of target for count/duration; 1 for check',
+          }),
+          tiny: Schema.string({
+            description: 'the two-minute version for bad days, e.g. "Put on your running shoes", max 8 words',
+          }),
+          cue: Schema.string({
+            description: 'an existing routine to anchor it to, phrased "After I …" or "When I …", max 6 words',
+          }),
           unit: Schema.string({
             nullable: true,
             description: 'unit for count habits e.g. pages, glasses; "min" for duration; null for check',
@@ -135,7 +154,7 @@ const coachSchema = Schema.object({
           reminder: Schema.string({ nullable: true, description: 'best reminder time HH:mm (24h) or null' }),
           why: Schema.string({ description: 'one sentence on why this habit moves the goal forward' }),
         },
-        optionalProperties: ['days', 'timesPerWeek'],
+        optionalProperties: ['days', 'timesPerWeek', 'start', 'tiny', 'cue'],
       }),
     }),
     tips: Schema.array({ items: Schema.string(), maxItems: 3 }),
@@ -147,18 +166,23 @@ export async function coachPlan(goal: string, context: { existing: Habit[]; name
   type Raw = {
     title: string;
     summary: string;
-    habits: (Omit<CoachHabit, 'schedule' | 'color' | 'icon'> & {
+    habits: (Omit<CoachHabit, 'schedule' | 'color' | 'icon' | 'goalTarget' | 'tiny' | 'cue'> & {
       icon?: string;
       scheduleType: Schedule['type'];
       days?: number[];
       timesPerWeek?: number;
+      start?: number;
+      tiny?: string;
+      cue?: string;
     })[];
     tips: string[];
   };
   const raw = await generateJSON<Raw>({
     system:
       "You are Ritual's habit coach, grounded in behaviour science (tiny habits, implementation intentions, habit stacking). " +
-      'Design 2-5 small, specific, measurable habits that compound toward the goal. Start easy — consistency beats intensity. ' +
+      'Design 2-5 small, specific, measurable habits that compound toward the goal. Break the goal into a ladder: each habit ' +
+      'has a final target and a much smaller start, plus a two-minute version and a cue tied to an existing routine. ' +
+      'Consistency beats intensity: people who start small and build up are far more likely to keep going. ' +
       'Avoid duplicating habits the user already has. Be warm and concise.',
     prompt: `Goal: """${goal.slice(0, 600)}"""\nExisting habits: ${existing}`,
     schema: coachSchema,
@@ -178,12 +202,22 @@ export async function coachPlan(goal: string, context: { existing: Habit[]; name
             ? { type: 'weekly', times: Math.min(6, Math.max(1, h.timesPerWeek ?? 3)) }
             : { type: 'daily' };
       const kind: HabitKind = ['check', 'count', 'duration'].includes(h.kind) ? h.kind : 'check';
+      const unit = kind === 'check' ? null : kind === 'duration' ? 'min' : h.unit || 'times';
+      const goal = kind === 'check' ? 1 : Math.max(1, Math.round(h.target));
+      // The model proposes a start; keep it a genuine first rung (below the goal, never trivial).
+      const start =
+        kind === 'check'
+          ? 1
+          : niceAmount({ kind, unit }, Math.min(goal, Math.max(kind === 'duration' ? 2 : 1, h.start ?? goal * 0.4)));
       return {
         name: h.name,
         icon: h.icon && HABIT_ICONS.includes(h.icon) ? h.icon : 'sparkle',
         kind,
-        target: kind === 'check' ? 1 : Math.max(1, Math.round(h.target)),
-        unit: kind === 'check' ? null : kind === 'duration' ? 'min' : h.unit || 'times',
+        target: start,
+        goalTarget: start < goal ? goal : null,
+        tiny: h.tiny?.trim() ? h.tiny.trim().slice(0, 60) : null,
+        cue: h.cue?.trim() ? h.cue.trim().slice(0, 60) : null,
+        unit,
         schedule,
         difficulty: h.difficulty ?? 'medium',
         reminder: h.reminder && /^\d{2}:\d{2}$/.test(h.reminder) ? h.reminder : null,

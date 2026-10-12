@@ -88,7 +88,7 @@ function TabItem({
   const t = useTheme();
   const dot = useSharedValue(focused ? 1 : 0);
   useEffect(() => {
-    dot.value = withSpring(focused ? 1 : 0, { damping: 14, stiffness: 260 });
+    dot.value = withSpring(focused ? 1 : 0, { damping: 22, stiffness: 260 });
   }, [focused, dot]);
   const dotStyle = useAnimatedStyle(() => ({ opacity: dot.value, transform: [{ scale: 0.4 + dot.value * 0.6 }] }));
   return (

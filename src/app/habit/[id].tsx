@@ -8,10 +8,13 @@ import { addDays, DayKey, fromDayKey, orderedWeekdays, toDayKey, WEEKDAY_LETTER 
 import { isEntryDone, isEntrySkipped, isScheduledOn, progressOf, scheduleLabel, targetLabel } from '@/domain/habits';
 import type { Habit } from '@/domain/types';
 import { nextMilestone } from '@/domain/xp';
-import { useHabit, useSnapshot, useToday } from '@/data/hooks';
+import { PHASE_LABEL, tinyVersion } from '@/domain/behavior';
+import { useBehavior, useHabit, useSnapshot, useToday } from '@/data/hooks';
 import { useApp } from '@/data/store';
 import { toast } from '@/data/ui';
+import { CoachCard } from '@/features/coach/CoachCard';
 import { toggleHabit } from '@/features/habits/actions';
+import { formatTime } from '@/features/habits/pickers';
 import { autoIcon, autoLabel, formatAmount, MOODS, timeAgo } from '@/features/habits/format';
 import { HabitIcon } from '@/features/habits/HabitIcon';
 import { LogSheet } from '@/features/habits/LogSheet';
@@ -157,6 +160,7 @@ export default function HabitDetailScreen() {
   const integrations = useApp((s) => s.integrations);
   const [logDay, setLogDay] = useState<DayKey | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const { patterns } = useBehavior();
 
   const stats = habit ? snapshot.habitStats.get(habit.id) : undefined;
   const byDay = habit ? snapshot.index.get(habit.id) : undefined;
@@ -186,6 +190,8 @@ export default function HabitDetailScreen() {
 
   const unit = stats.streak.unit;
   const next = nextMilestone(unit, stats.streak.current);
+  const pattern = patterns.get(habit.id);
+  const isScreen = habit.auto?.provider === 'screen';
   const category = habit.category ? CATEGORY_BY_ID.get(habit.category) : null;
   const auto = autoLabel(habit.auto);
   const sourceIcon = autoIcon(habit.auto);
@@ -215,7 +221,19 @@ export default function HabitDetailScreen() {
     .filter(Boolean)
     .join(' · ');
 
-  const footer = habit.archived ? undefined : habit.kind === 'duration' && !doneToday ? (
+  const twoMin = (
+    <Button
+      title="2 min"
+      icon="timer"
+      variant="secondary"
+      size="lg"
+      accessibilityLabel="Start with just two minutes"
+      onPress={() => router.push({ pathname: '/focus/[id]', params: { id: habit.id, minutes: '2' } })}
+    />
+  );
+  const main = habit.archived ? undefined : isScreen ? (
+    <Button title="See screen time" icon="hourglass-high" size="lg" full onPress={() => router.push('/screen-time')} />
+  ) : habit.kind === 'duration' && !doneToday ? (
     <Button title="Start focus session" icon="play" size="lg" full onPress={() => router.push(`/focus/${habit.id}`)} />
   ) : habit.kind === 'check' ? (
     <Button
@@ -236,6 +254,16 @@ export default function HabitDetailScreen() {
       onPress={() => setLogDay(today)}
     />
   );
+  // "Just start" sits next to the main action until the habit is done: starting is the hard part.
+  const footer =
+    main && !doneToday && !isScreen && habit.kind !== 'duration' ? (
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {twoMin}
+        <View style={{ flex: 1 }}>{main}</View>
+      </View>
+    ) : (
+      main
+    );
 
   return (
     <>
@@ -272,6 +300,15 @@ export default function HabitDetailScreen() {
           </View>
         ) : null}
 
+        {habit.cue ? (
+          <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 2 }}>
+            <Icon name="clock" size={16} color={t.textMuted} />
+            <Text variant="caption" tone="muted" style={{ flex: 1 }}>
+              {habit.cue}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Hero: the streak, wrapped in progress toward the next milestone */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 22, paddingVertical: 6 }}>
           <ProgressRing progress={next ? stats.streak.current / next : 1} size={148} stroke={10}>
@@ -303,6 +340,62 @@ export default function HabitDetailScreen() {
           </Text>
         ) : null}
 
+        {pattern && !isScreen ? (
+          <Card style={{ gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+              <Text variant="bodyStrong" style={{ flex: 1 }}>
+                Habit strength
+              </Text>
+              <Text weight="bold" size={18} tabular>
+                {Math.round(pattern.strength.value * 100)}%
+              </Text>
+            </View>
+            <View style={{ height: 6, borderRadius: 3, backgroundColor: t.surface3, overflow: 'hidden' }}>
+              <View
+                style={{
+                  width: `${Math.max(2, Math.round(pattern.strength.value * 100))}%`,
+                  height: '100%',
+                  borderRadius: 3,
+                  backgroundColor: t.scheme === 'dark' ? t.accent : t.accentInk,
+                }}
+              />
+            </View>
+            <Text variant="caption" tone="muted">
+              {pattern.strength.phase === 'automatic'
+                ? 'Automatic. This is part of who you are now; a missed day won’t undo it.'
+                : `${PHASE_LABEL[pattern.strength.phase]} · about ${pattern.strength.daysToAutomatic} more days of showing up until it runs on its own. A missed day only dents it.`}
+            </Text>
+            {pattern.usualTime || habit.goalTarget ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+                {pattern.usualTime ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Icon name="clock-countdown" size={14} color={t.textMuted} />
+                    <Text variant="caption" tone="muted">
+                      Usually around {formatTime(pattern.usualTime)}
+                    </Text>
+                  </View>
+                ) : null}
+                {habit.goalTarget && habit.goalTarget > habit.target ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Icon name="stairs" size={14} color={t.textMuted} />
+                    <Text variant="caption" tone="muted">
+                      Building up to {targetLabel({ ...habit, target: habit.goalTarget })}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="plant" size={14} color={t.textMuted} />
+              <Text variant="caption" tone="muted" style={{ flex: 1 }}>
+                Hard day? The two-minute version counts: {tinyVersion(habit).label.toLowerCase()}.
+              </Text>
+            </View>
+          </Card>
+        ) : null}
+
+        <CoachCard habitId={habit.id} />
+
         {habit.auto ? (
           <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
@@ -326,9 +419,11 @@ export default function HabitDetailScreen() {
                     ? `@${habit.auto.username} · ${providerState?.lastSyncAt ? `synced ${timeAgo(providerState.lastSyncAt)}` : 'not synced yet'}`
                     : habit.auto.provider === 'device'
                       ? 'Counted by your phone, even with Ritual closed'
-                      : providerState?.lastSyncAt
-                        ? `Health Connect · synced ${timeAgo(providerState.lastSyncAt)}`
-                        : 'Health Connect'}
+                      : habit.auto.provider === 'screen'
+                        ? `Limit ${habit.auto.limitMin} min · measured from your phone's usage log`
+                        : providerState?.lastSyncAt
+                          ? `Health Connect · synced ${timeAgo(providerState.lastSyncAt)}`
+                          : 'Health Connect'}
               </Text>
             </View>
             <Button

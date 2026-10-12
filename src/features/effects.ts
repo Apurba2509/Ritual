@@ -9,6 +9,7 @@ import { useUI } from '@/data/ui';
 import { runAutoTracking } from './integrations/engine';
 import { rescheduleSoon } from './notifications/scheduler';
 import { importFinishedWorkouts, refreshSensing } from './sensing';
+import { syncPauseConfig } from './screen';
 import { registerBackgroundSensing } from './sensing/background';
 import { watchWidget } from '@/widget/register';
 import { postActivity } from './social/api';
@@ -57,6 +58,9 @@ export function useForegroundTasks() {
     runAutoTracking({ reason: 'launch' }).finally(refreshSensing);
     registerBackgroundSensing();
     watchWidget();
+    // The pause runs natively without the JS app; keep its copy of the config (and the swap
+    // habit's name) current.
+    syncPauseConfig();
     const sub = AppState.addEventListener('change', (s) => {
       if (s !== 'active') return;
       rescheduleSoon(800);

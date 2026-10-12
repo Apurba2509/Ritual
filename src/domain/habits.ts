@@ -3,8 +3,19 @@ import type { Entry, EntryIndex, Habit, Schedule } from './types';
 
 // ─── Progress ────────────────────────────────────────────────────────────────
 
+/** The goal a day is measured against: what was recorded with the entry, else the current target. */
+export function goalOf(habit: Pick<Habit, 'target'>, entry: Entry | undefined): number {
+  const g = entry?.goal;
+  return typeof g === 'number' && g > 0 ? g : habit.target;
+}
+
 export function isEntryDone(habit: Habit, entry: Entry | undefined): boolean {
-  return !!entry && !entry.deleted && !entry.skipped && entry.value >= habit.target;
+  return !!entry && !entry.deleted && !entry.skipped && entry.value >= goalOf(habit, entry);
+}
+
+/** Done with the two-minute version rather than the full target. */
+export function isTinyEntry(habit: Habit, entry: Entry | undefined): boolean {
+  return isEntryDone(habit, entry) && goalOf(habit, entry) < habit.target && entry!.value < habit.target;
 }
 
 export function isEntrySkipped(entry: Entry | undefined): boolean {
@@ -13,7 +24,7 @@ export function isEntrySkipped(entry: Entry | undefined): boolean {
 
 export function progressOf(habit: Habit, entry: Entry | undefined): number {
   if (!entry || entry.deleted || entry.skipped) return 0;
-  return Math.min(1, entry.value / Math.max(1, habit.target));
+  return Math.min(1, entry.value / Math.max(1, goalOf(habit, entry)));
 }
 
 export function buildEntryIndex(entries: Iterable<Entry>): EntryIndex {

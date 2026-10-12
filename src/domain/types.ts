@@ -18,7 +18,12 @@ export type AutoSource =
   | { provider: 'github'; username: string }
   | { provider: 'leetcode'; username: string }
   | { provider: 'health'; metric: HealthMetric }
-  | { provider: 'device'; metric: DeviceMetric };
+  | { provider: 'device'; metric: DeviceMetric }
+  /** Screen-time limit: done for the day while usage stays at or under `limitMin`. */
+  | { provider: 'screen'; scope: ScreenScope; limitMin: number };
+
+/** `all` = total screen time, `guarded` = only the apps you chose to guard (social, video, games…). */
+export type ScreenScope = 'all' | 'guarded';
 
 export type HealthMetric = 'steps' | 'exercise' | 'sleep';
 
@@ -26,7 +31,7 @@ export type HealthMetric = 'steps' | 'exercise' | 'sleep';
 export type DeviceMetric = 'steps' | WorkoutType;
 
 export type EntrySource =
-  'manual' | 'notification' | 'timer' | 'ai' | 'github' | 'leetcode' | 'health' | 'device' | 'workout';
+  'manual' | 'notification' | 'timer' | 'ai' | 'github' | 'leetcode' | 'health' | 'device' | 'workout' | 'screen';
 
 export type CategoryId =
   'health' | 'fitness' | 'mind' | 'learning' | 'career' | 'productivity' | 'social' | 'finance' | 'creativity' | 'home';
@@ -63,6 +68,17 @@ export interface Habit extends SyncFields {
   /** Set when the habit was created by joining a community challenge. */
   challengeId: string | null;
   createdAt: number;
+  /**
+   * Where this habit is heading. `target` is today's step on the ladder; the coach raises it
+   * toward `goalTarget` as the habit sticks (and lowers it when it's too much).
+   */
+  goalTarget?: number | null;
+  /** Implementation intention, e.g. "After my morning coffee". */
+  cue?: string | null;
+  /** The two-minute version, in the user's own words (falls back to a smart default). */
+  tiny?: string | null;
+  /** Last time the coach changed the target or schedule — spaces out further suggestions. */
+  adjustedAt?: number | null;
 }
 
 export type Mood = 1 | 2 | 3 | 4 | 5;
@@ -82,6 +98,12 @@ export interface Entry extends SyncFields {
   source: EntrySource;
   /** When the target was first reached (ms) — used for early-bird / night-owl badges. */
   completedAt: number | null;
+  /**
+   * The goal this day was held to. Recorded at write time so changing a habit's target never
+   * rewrites history, and a "tiny version" day can count in full. Missing on older entries,
+   * which fall back to the habit's current target.
+   */
+  goal?: number | null;
 }
 
 export const entryId = (habitId: string, date: DayKey) => `${habitId}_${date}`;

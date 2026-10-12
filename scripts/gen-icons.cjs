@@ -19,6 +19,8 @@ const UI = `
   rocket-launch seal-check share-network shield-check sign-in sign-out sliders-horizontal smiley smiley-blank
   smiley-meh smiley-sad smiley-wink sparkle squares-four star sun-horizon target thumbs-up timer trash
   trend-down trend-up trophy upload-simple user user-circle user-plus users-three warning x
+  arrow-u-up-left arrow-down-right calendar-x flag-banner stack-minus hand-palm battery-warning
+  battery-charging shield-warning hourglass hourglass-high ladder stairs path lock-key key tray
 `;
 
 const HABITS = `

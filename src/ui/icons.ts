@@ -4,14 +4,18 @@ import { AlarmIcon } from 'phosphor-react-native/src/icons/Alarm';
 import { ArchiveIcon } from 'phosphor-react-native/src/icons/Archive';
 import { ArrowClockwiseIcon } from 'phosphor-react-native/src/icons/ArrowClockwise';
 import { ArrowCounterClockwiseIcon } from 'phosphor-react-native/src/icons/ArrowCounterClockwise';
+import { ArrowDownRightIcon } from 'phosphor-react-native/src/icons/ArrowDownRight';
 import { ArrowLeftIcon } from 'phosphor-react-native/src/icons/ArrowLeft';
 import { ArrowRightIcon } from 'phosphor-react-native/src/icons/ArrowRight';
+import { ArrowUUpLeftIcon } from 'phosphor-react-native/src/icons/ArrowUUpLeft';
 import { ArrowUpRightIcon } from 'phosphor-react-native/src/icons/ArrowUpRight';
 import { ArrowsClockwiseIcon } from 'phosphor-react-native/src/icons/ArrowsClockwise';
 import { AtIcon } from 'phosphor-react-native/src/icons/At';
 import { AtomIcon } from 'phosphor-react-native/src/icons/Atom';
 import { BarbellIcon } from 'phosphor-react-native/src/icons/Barbell';
 import { BasketballIcon } from 'phosphor-react-native/src/icons/Basketball';
+import { BatteryChargingIcon } from 'phosphor-react-native/src/icons/BatteryCharging';
+import { BatteryWarningIcon } from 'phosphor-react-native/src/icons/BatteryWarning';
 import { BedIcon } from 'phosphor-react-native/src/icons/Bed';
 import { BeerBottleIcon } from 'phosphor-react-native/src/icons/BeerBottle';
 import { BellIcon } from 'phosphor-react-native/src/icons/Bell';
@@ -27,6 +31,7 @@ import { BroomIcon } from 'phosphor-react-native/src/icons/Broom';
 import { CalculatorIcon } from 'phosphor-react-native/src/icons/Calculator';
 import { CalendarBlankIcon } from 'phosphor-react-native/src/icons/CalendarBlank';
 import { CalendarCheckIcon } from 'phosphor-react-native/src/icons/CalendarCheck';
+import { CalendarXIcon } from 'phosphor-react-native/src/icons/CalendarX';
 import { CameraIcon } from 'phosphor-react-native/src/icons/Camera';
 import { CarIcon } from 'phosphor-react-native/src/icons/Car';
 import { CaretDownIcon } from 'phosphor-react-native/src/icons/CaretDown';
@@ -72,6 +77,7 @@ import { FeatherIcon } from 'phosphor-react-native/src/icons/Feather';
 import { FilmSlateIcon } from 'phosphor-react-native/src/icons/FilmSlate';
 import { FireIcon } from 'phosphor-react-native/src/icons/Fire';
 import { FlagIcon } from 'phosphor-react-native/src/icons/Flag';
+import { FlagBannerIcon } from 'phosphor-react-native/src/icons/FlagBanner';
 import { FlaskIcon } from 'phosphor-react-native/src/icons/Flask';
 import { FlowerLotusIcon } from 'phosphor-react-native/src/icons/FlowerLotus';
 import { FootprintsIcon } from 'phosphor-react-native/src/icons/Footprints';
@@ -85,6 +91,7 @@ import { GlobeSimpleIcon } from 'phosphor-react-native/src/icons/GlobeSimple';
 import { GraduationCapIcon } from 'phosphor-react-native/src/icons/GraduationCap';
 import { GuitarIcon } from 'phosphor-react-native/src/icons/Guitar';
 import { HandHeartIcon } from 'phosphor-react-native/src/icons/HandHeart';
+import { HandPalmIcon } from 'phosphor-react-native/src/icons/HandPalm';
 import { HandSoapIcon } from 'phosphor-react-native/src/icons/HandSoap';
 import { HandWavingIcon } from 'phosphor-react-native/src/icons/HandWaving';
 import { HandsClappingIcon } from 'phosphor-react-native/src/icons/HandsClapping';
@@ -92,6 +99,8 @@ import { HeadphonesIcon } from 'phosphor-react-native/src/icons/Headphones';
 import { HeartIcon } from 'phosphor-react-native/src/icons/Heart';
 import { HeartbeatIcon } from 'phosphor-react-native/src/icons/Heartbeat';
 import { HexagonIcon } from 'phosphor-react-native/src/icons/Hexagon';
+import { HourglassIcon } from 'phosphor-react-native/src/icons/Hourglass';
+import { HourglassHighIcon } from 'phosphor-react-native/src/icons/HourglassHigh';
 import { HourglassMediumIcon } from 'phosphor-react-native/src/icons/HourglassMedium';
 import { HouseIcon } from 'phosphor-react-native/src/icons/House';
 import { ImageIcon } from 'phosphor-react-native/src/icons/Image';
@@ -99,12 +108,14 @@ import { InfinityIcon } from 'phosphor-react-native/src/icons/Infinity';
 import { InfoIcon } from 'phosphor-react-native/src/icons/Info';
 import { KanbanIcon } from 'phosphor-react-native/src/icons/Kanban';
 import { KeyIcon } from 'phosphor-react-native/src/icons/Key';
+import { LadderIcon } from 'phosphor-react-native/src/icons/Ladder';
 import { LaptopIcon } from 'phosphor-react-native/src/icons/Laptop';
 import { LeafIcon } from 'phosphor-react-native/src/icons/Leaf';
 import { LightbulbIcon } from 'phosphor-react-native/src/icons/Lightbulb';
 import { LightningIcon } from 'phosphor-react-native/src/icons/Lightning';
 import { LinkIcon } from 'phosphor-react-native/src/icons/Link';
 import { ListChecksIcon } from 'phosphor-react-native/src/icons/ListChecks';
+import { LockKeyIcon } from 'phosphor-react-native/src/icons/LockKey';
 import { LockSimpleIcon } from 'phosphor-react-native/src/icons/LockSimple';
 import { MagicWandIcon } from 'phosphor-react-native/src/icons/MagicWand';
 import { MagnifyingGlassIcon } from 'phosphor-react-native/src/icons/MagnifyingGlass';
@@ -120,6 +131,7 @@ import { OrangeSliceIcon } from 'phosphor-react-native/src/icons/OrangeSlice';
 import { PaintBrushIcon } from 'phosphor-react-native/src/icons/PaintBrush';
 import { PaletteIcon } from 'phosphor-react-native/src/icons/Palette';
 import { PaperPlaneTiltIcon } from 'phosphor-react-native/src/icons/PaperPlaneTilt';
+import { PathIcon } from 'phosphor-react-native/src/icons/Path';
 import { PauseIcon } from 'phosphor-react-native/src/icons/Pause';
 import { PawPrintIcon } from 'phosphor-react-native/src/icons/PawPrint';
 import { PenNibIcon } from 'phosphor-react-native/src/icons/PenNib';
@@ -150,6 +162,7 @@ import { ScrollIcon } from 'phosphor-react-native/src/icons/Scroll';
 import { SealCheckIcon } from 'phosphor-react-native/src/icons/SealCheck';
 import { ShareNetworkIcon } from 'phosphor-react-native/src/icons/ShareNetwork';
 import { ShieldCheckIcon } from 'phosphor-react-native/src/icons/ShieldCheck';
+import { ShieldWarningIcon } from 'phosphor-react-native/src/icons/ShieldWarning';
 import { ShoppingCartIcon } from 'phosphor-react-native/src/icons/ShoppingCart';
 import { ShowerIcon } from 'phosphor-react-native/src/icons/Shower';
 import { SignInIcon } from 'phosphor-react-native/src/icons/SignIn';
@@ -165,6 +178,8 @@ import { SnowflakeIcon } from 'phosphor-react-native/src/icons/Snowflake';
 import { SoccerBallIcon } from 'phosphor-react-native/src/icons/SoccerBall';
 import { SparkleIcon } from 'phosphor-react-native/src/icons/Sparkle';
 import { SquaresFourIcon } from 'phosphor-react-native/src/icons/SquaresFour';
+import { StackMinusIcon } from 'phosphor-react-native/src/icons/StackMinus';
+import { StairsIcon } from 'phosphor-react-native/src/icons/Stairs';
 import { StarIcon } from 'phosphor-react-native/src/icons/Star';
 import { SunIcon } from 'phosphor-react-native/src/icons/Sun';
 import { SunHorizonIcon } from 'phosphor-react-native/src/icons/SunHorizon';
@@ -175,6 +190,7 @@ import { TimerIcon } from 'phosphor-react-native/src/icons/Timer';
 import { ToothIcon } from 'phosphor-react-native/src/icons/Tooth';
 import { TranslateIcon } from 'phosphor-react-native/src/icons/Translate';
 import { TrashIcon } from 'phosphor-react-native/src/icons/Trash';
+import { TrayIcon } from 'phosphor-react-native/src/icons/Tray';
 import { TreeIcon } from 'phosphor-react-native/src/icons/Tree';
 import { TrendDownIcon } from 'phosphor-react-native/src/icons/TrendDown';
 import { TrendUpIcon } from 'phosphor-react-native/src/icons/TrendUp';
@@ -194,14 +210,18 @@ export const ICONS = {
   archive: ArchiveIcon,
   'arrow-clockwise': ArrowClockwiseIcon,
   'arrow-counter-clockwise': ArrowCounterClockwiseIcon,
+  'arrow-down-right': ArrowDownRightIcon,
   'arrow-left': ArrowLeftIcon,
   'arrow-right': ArrowRightIcon,
+  'arrow-u-up-left': ArrowUUpLeftIcon,
   'arrow-up-right': ArrowUpRightIcon,
   'arrows-clockwise': ArrowsClockwiseIcon,
   at: AtIcon,
   atom: AtomIcon,
   barbell: BarbellIcon,
   basketball: BasketballIcon,
+  'battery-charging': BatteryChargingIcon,
+  'battery-warning': BatteryWarningIcon,
   bed: BedIcon,
   'beer-bottle': BeerBottleIcon,
   bell: BellIcon,
@@ -217,6 +237,7 @@ export const ICONS = {
   calculator: CalculatorIcon,
   'calendar-blank': CalendarBlankIcon,
   'calendar-check': CalendarCheckIcon,
+  'calendar-x': CalendarXIcon,
   camera: CameraIcon,
   car: CarIcon,
   'caret-down': CaretDownIcon,
@@ -262,6 +283,7 @@ export const ICONS = {
   'film-slate': FilmSlateIcon,
   fire: FireIcon,
   flag: FlagIcon,
+  'flag-banner': FlagBannerIcon,
   flask: FlaskIcon,
   'flower-lotus': FlowerLotusIcon,
   footprints: FootprintsIcon,
@@ -275,6 +297,7 @@ export const ICONS = {
   'graduation-cap': GraduationCapIcon,
   guitar: GuitarIcon,
   'hand-heart': HandHeartIcon,
+  'hand-palm': HandPalmIcon,
   'hand-soap': HandSoapIcon,
   'hand-waving': HandWavingIcon,
   'hands-clapping': HandsClappingIcon,
@@ -282,6 +305,8 @@ export const ICONS = {
   heart: HeartIcon,
   heartbeat: HeartbeatIcon,
   hexagon: HexagonIcon,
+  hourglass: HourglassIcon,
+  'hourglass-high': HourglassHighIcon,
   'hourglass-medium': HourglassMediumIcon,
   house: HouseIcon,
   image: ImageIcon,
@@ -289,12 +314,14 @@ export const ICONS = {
   info: InfoIcon,
   kanban: KanbanIcon,
   key: KeyIcon,
+  ladder: LadderIcon,
   laptop: LaptopIcon,
   leaf: LeafIcon,
   lightbulb: LightbulbIcon,
   lightning: LightningIcon,
   link: LinkIcon,
   'list-checks': ListChecksIcon,
+  'lock-key': LockKeyIcon,
   'lock-simple': LockSimpleIcon,
   'magic-wand': MagicWandIcon,
   'magnifying-glass': MagnifyingGlassIcon,
@@ -310,6 +337,7 @@ export const ICONS = {
   'paint-brush': PaintBrushIcon,
   palette: PaletteIcon,
   'paper-plane-tilt': PaperPlaneTiltIcon,
+  path: PathIcon,
   pause: PauseIcon,
   'paw-print': PawPrintIcon,
   'pen-nib': PenNibIcon,
@@ -340,6 +368,7 @@ export const ICONS = {
   'seal-check': SealCheckIcon,
   'share-network': ShareNetworkIcon,
   'shield-check': ShieldCheckIcon,
+  'shield-warning': ShieldWarningIcon,
   'shopping-cart': ShoppingCartIcon,
   shower: ShowerIcon,
   'sign-in': SignInIcon,
@@ -355,6 +384,8 @@ export const ICONS = {
   'soccer-ball': SoccerBallIcon,
   sparkle: SparkleIcon,
   'squares-four': SquaresFourIcon,
+  'stack-minus': StackMinusIcon,
+  stairs: StairsIcon,
   star: StarIcon,
   sun: SunIcon,
   'sun-horizon': SunHorizonIcon,
@@ -365,6 +396,7 @@ export const ICONS = {
   tooth: ToothIcon,
   translate: TranslateIcon,
   trash: TrashIcon,
+  tray: TrayIcon,
   tree: TreeIcon,
   'trend-down': TrendDownIcon,
   'trend-up': TrendUpIcon,

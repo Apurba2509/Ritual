@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { DayKey, fromDayKey, todayKey } from '@/domain/dates';
-import { isEntryDone } from '@/domain/habits';
+import { goalOf, isEntryDone } from '@/domain/habits';
 import { entryId, Habit, Mood } from '@/domain/types';
 import { useApp } from '@/data/store';
 import { toast } from '@/data/ui';
@@ -95,7 +95,9 @@ export function LogSheet({ habit, day, onClose }: { habit: Habit | null; day: Da
     ? 'Today'
     : fromDayKey(day).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
   const step = stepFor(habit);
-  const doneNow = value >= habit.target;
+  // Past days are measured against the goal they were held to (it may differ from today's target).
+  const goal = goalOf(habit, live);
+  const doneNow = value >= goal;
 
   const save = () => {
     if (value !== (live?.value ?? 0)) setProgress(habit.id, day, value);
@@ -117,7 +119,7 @@ export function LogSheet({ habit, day, onClose }: { habit: Habit | null; day: Da
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <HabitIcon icon={habit.icon} color={habit.color} size={40} />
         <Text tone="muted" style={{ flex: 1 }}>
-          Target {formatAmount(habit, habit.target)}
+          Target {formatAmount(habit, goal)}
           {habit.kind === 'check' ? '' : ` · logged ${formatAmount(habit, value)}`}
         </Text>
       </View>
@@ -128,7 +130,7 @@ export function LogSheet({ habit, day, onClose }: { habit: Habit | null; day: Da
             title={doneNow ? 'Done' : 'Mark done'}
             icon={doneNow ? 'check-circle' : 'check'}
             variant={doneNow ? 'primary' : 'secondary'}
-            onPress={() => setValue(doneNow ? 0 : habit.target)}
+            onPress={() => setValue(doneNow ? 0 : goal)}
             style={{ flex: 1 }}
           />
         </View>
@@ -139,13 +141,7 @@ export function LogSheet({ habit, day, onClose }: { habit: Habit | null; day: Da
             {[step, step * 2, step * 5].map((s) => (
               <Chip key={s} label={`+${formatAmount(habit, s)}`} onPress={() => setValue(value + s)} size="sm" />
             ))}
-            <Chip
-              label="Hit target"
-              icon="target"
-              selected
-              onPress={() => setValue(Math.max(value, habit.target))}
-              size="sm"
-            />
+            <Chip label="Hit target" icon="target" selected onPress={() => setValue(Math.max(value, goal))} size="sm" />
           </View>
           {habit.kind === 'duration' && isToday ? (
             <Button

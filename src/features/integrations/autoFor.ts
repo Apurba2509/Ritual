@@ -1,11 +1,15 @@
 import type { HabitTemplate } from '@/domain/catalog';
 import type { AutoSource } from '@/domain/types';
+import { screenSupported } from '@/features/screen';
 import { sensingSupported } from '@/features/sensing';
 import { healthSupported } from './health';
 import { leetcodeSupported } from './leetcode';
 
 /** The best automatic source for a template on this device (phone sensors first, then Health Connect). */
 export function autoForTemplate(tpl: HabitTemplate): AutoSource | null {
+  if (tpl.autoHint === 'screen' && tpl.screen && screenSupported) {
+    return { provider: 'screen', scope: tpl.screen.scope, limitMin: tpl.screen.limitMin };
+  }
   if (tpl.autoHint === 'device' && tpl.deviceMetric && sensingSupported) {
     return { provider: 'device', metric: tpl.deviceMetric };
   }

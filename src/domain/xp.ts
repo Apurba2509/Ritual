@@ -14,6 +14,22 @@ export function completionXP(difficulty: Difficulty, streak: number): number {
   return Math.round(BASE_XP[difficulty] * mult);
 }
 
+/**
+ * Variable reward: roughly one completion in seven earns a surprise bonus. It's a pure function
+ * of the entry id, so every device agrees on it and XP stays derivable from history.
+ */
+export const LUCKY_XP = 15;
+export function luckyBonus(entryId: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < entryId.length; i++) h = Math.imul(h ^ entryId.charCodeAt(i), 16777619);
+  return (h >>> 0) % 7 === 3 ? LUCKY_XP : 0;
+}
+
+/** Tiny-version days keep the streak alive but earn half — the full version is still worth more. */
+export function tinyXP(full: number): number {
+  return Math.max(3, Math.round(full / 2));
+}
+
 export const DAY_MILESTONES: Record<number, number> = {
   7: 50,
   21: 150,

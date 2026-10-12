@@ -6,13 +6,15 @@ import { DayKey, fromDayKey } from '@/domain/dates';
 import { countDoneInWeek, isEntryDone, progressOf } from '@/domain/habits';
 import { localInsights } from '@/domain/insights';
 import type { Habit } from '@/domain/types';
-import { useDayList, useSnapshot, useToday } from '@/data/hooks';
+import { useDayList, useEasyMode, useSnapshot, useToday } from '@/data/hooks';
 import { useApp } from '@/data/store';
+import { CoachCard, EasyModeBanner } from '@/features/coach/CoachCard';
 import { greeting } from '@/features/habits/format';
 import { DoneRow, HabitRow } from '@/features/habits/HabitRow';
 import { LogSheet } from '@/features/habits/LogSheet';
 import { StarterPicker } from '@/features/habits/StarterPicker';
 import { runAutoTracking } from '@/features/integrations/engine';
+import { ScreenCard } from '@/features/screen/ScreenCard';
 import { MoveCard } from '@/features/sensing/MoveCard';
 import { TrackingPill } from '@/features/sensing/TrackingStatus';
 import { DayRing } from '@/features/today/DayRing';
@@ -43,6 +45,7 @@ export default function TodayScreen() {
   const [logHabit, setLogHabit] = useState<Habit | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showDone, setShowDone] = useState(true);
+  const easy = useEasyMode();
 
   const done = (i: Item) => isEntryDone(i.habit, i.entry);
   // Flexible "N× a week" habits only count toward today once done (same rule as the stats engine).
@@ -86,6 +89,7 @@ export default function TodayScreen() {
         weekProgress={weekly}
         onLongPress={setLogHabit}
         last={last}
+        easy={easy && day === today}
       />
     );
   };
@@ -113,6 +117,7 @@ export default function TodayScreen() {
         </View>
 
         <TrackingPill />
+        <EasyModeBanner />
 
         {demo ? (
           <Tap
@@ -142,7 +147,7 @@ export default function TodayScreen() {
                 stroke={compact ? 14 : 16}
               >
                 {allDone ? (
-                  <Animated.View entering={ZoomIn.springify().damping(12)} style={{ alignItems: 'center', gap: 6 }}>
+                  <Animated.View entering={ZoomIn.springify().damping(17)} style={{ alignItems: 'center', gap: 6 }}>
                     <Icon
                       name="check-circle"
                       size={ringSize * 0.2}
@@ -248,6 +253,8 @@ export default function TodayScreen() {
               </Tap>
             )}
 
+            {isToday ? <CoachCard /> : null}
+
             {upNext.length ? (
               <Section title={isToday ? 'Up next' : 'Not done'} action={<Count n={upNext.length} />}>
                 <View>{upNext.map((i, idx) => row(i, idx, idx === upNext.length - 1))}</View>
@@ -298,8 +305,10 @@ export default function TodayScreen() {
               </Section>
             ) : null}
 
+            {isToday ? <ScreenCard /> : null}
+
             {insight && isToday ? (
-              <Animated.View entering={FadeInDown.delay(250).springify().damping(18)}>
+              <Animated.View entering={FadeInDown.delay(250).duration(300)}>
                 <Tap
                   onPress={() => router.push('/(tabs)/insights')}
                   scaleTo={0.99}

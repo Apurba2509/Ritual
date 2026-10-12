@@ -65,6 +65,8 @@ export function autoLabel(auto: AutoSource | null): string | null {
           : auto.metric === 'ride'
             ? 'Rides'
             : 'Walks';
+    case 'screen':
+      return auto.scope === 'all' ? 'Screen time' : 'Guarded apps';
   }
 }
 
@@ -85,6 +87,8 @@ export function autoIcon(auto: AutoSource | null): IconName | null {
           : auto.metric === 'ride'
             ? 'person-simple-bike'
             : 'person-simple-walk';
+    case 'screen':
+      return 'hourglass-high';
   }
 }
 

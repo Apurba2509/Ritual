@@ -1,8 +1,10 @@
 import { deviceValues } from '@/domain/activity';
+import { limitValues } from '@/domain/screen';
 import type { DayKey } from '@/domain/dates';
 import type { EntrySource, Habit } from '@/domain/types';
 import { useApp } from '@/data/store';
-import { applyAutoValues } from '@/features/habits/actions';
+import { applyAutoValues, applyScreenValues } from '@/features/habits/actions';
+import { screenDays, screenSupported } from '@/features/screen';
 import { deviceData, sensingSupported } from '@/features/sensing';
 import { fetchGithubDaily } from './github';
 import { fetchHealthDaily, healthSupported } from './health';
@@ -42,13 +44,25 @@ async function fetchFor(habit: Habit): Promise<{ values: Record<DayKey, number>;
         values: deviceValues(habit, await deviceData(30)),
         source: auto.metric === 'steps' ? 'device' : 'workout',
       };
+    case 'screen':
+      if (!screenSupported) return null;
+      return {
+        values: limitValues(habit, await screenDays(8), new Set(useApp.getState().guard.apps)),
+        source: 'screen',
+      };
   }
+}
+
+function apply(habit: Habit, res: { values: Record<DayKey, number>; source: EntrySource }) {
+  return res.source === 'screen'
+    ? applyScreenValues(habit.id, res.values)
+    : applyAutoValues(habit.id, normalize(habit, res.values), res.source);
 }
 
 export async function syncHabitNow(habit: Habit): Promise<number> {
   const res = await fetchFor(habit);
   if (!res) return 0;
-  return applyAutoValues(habit.id, normalize(habit, res.values), res.source);
+  return apply(habit, res);
 }
 
 export function runAutoTracking(
@@ -70,19 +84,26 @@ export function runAutoTracking(
           ? `health:${auto.metric}`
           : auto.provider === 'device'
             ? `device:${auto.metric}:${habit.kind}:${habit.unit ?? ''}`
-            : `${auto.provider}:${auto.username.toLowerCase()}`;
+            : auto.provider === 'screen'
+              ? `screen:${habit.id}`
+              : `${auto.provider}:${auto.username.toLowerCase()}`;
       // On-device data is local and cheap, so it refreshes far more often than network providers.
-      const interval = auto.provider === 'device' ? 30_000 : MIN_INTERVAL;
+      const local = auto.provider === 'device' || auto.provider === 'screen';
+      const interval = local ? 30_000 : MIN_INTERVAL;
       if (!opts.force && now - (lastRun[key] ?? 0) < interval) continue;
       if (!cache.has(key)) cache.set(key, fetchFor(habit));
       try {
         const res = await cache.get(key)!;
         lastRun[key] = now;
         if (!res) continue;
-        total += applyAutoValues(habit.id, normalize(habit, res.values), res.source);
-        if (auto.provider !== 'device') markIntegration(auto.provider, null);
+        total += apply(habit, res);
+        if (!local) markIntegration(auto.provider as 'github' | 'leetcode' | 'health', null);
       } catch (e) {
-        if (auto.provider !== 'device') markIntegration(auto.provider, e instanceof Error ? e.message : String(e));
+        if (!local)
+          markIntegration(
+            auto.provider as 'github' | 'leetcode' | 'health',
+            e instanceof Error ? e.message : String(e),
+          );
       }
     }
     return total;

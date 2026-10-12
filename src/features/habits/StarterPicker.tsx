@@ -92,12 +92,7 @@ export function StarterPicker() {
           const on = picked.includes(tpl.id);
           const autoAvailable = templateAutoAvailable(tpl);
           return (
-            <Animated.View
-              key={tpl.id}
-              entering={FadeInDown.delay(i * 35)
-                .springify()
-                .damping(18)}
-            >
+            <Animated.View key={tpl.id} entering={FadeInDown.delay(i * 35).duration(260)}>
               <Tap
                 onPress={() => setPicked((p) => (p.includes(tpl.id) ? p.filter((x) => x !== tpl.id) : [...p, tpl.id]))}
                 scaleTo={0.96}

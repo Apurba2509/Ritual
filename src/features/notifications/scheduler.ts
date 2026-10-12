@@ -2,9 +2,10 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { todayKey } from '@/domain/dates';
 import { isEntryDone, targetLabel } from '@/domain/habits';
-import { PlannedKind, planNotifications } from '@/domain/notifications';
+import { tinyVersion } from '@/domain/behavior';
+import { PersonalSignals, PlannedKind, planNotifications } from '@/domain/notifications';
 import type { Habit } from '@/domain/types';
-import { getSnapshot } from '@/data/hooks';
+import { getBehavior, getSnapshot } from '@/data/hooks';
 import { useApp } from '@/data/store';
 import { useSensing } from '@/features/sensing';
 
@@ -131,6 +132,7 @@ export async function rescheduleAll() {
     eveningNudge: settings.eveningNudge,
     quietHours: settings.quietHours?.enabled ? settings.quietHours : null,
     stepsToday: useSensing.getState().stepsToday,
+    personal: personalSignals(snap),
   });
 
   for (const n of plan.slice(0, MAX_PENDING)) {
@@ -150,13 +152,35 @@ export async function rescheduleAll() {
 }
 
 /** A habit just completed itself (sensors, GitHub, LeetCode) — say so if the app isn't open. */
-export async function notifyAutoComplete(habit: Habit, detail: string) {
+/** Feed the planner what the behaviour engine has learned about this person. */
+function personalSignals(snap: ReturnType<typeof getSnapshot>): PersonalSignals {
+  const { patterns, user } = getBehavior(snap);
+  const app = useApp.getState();
+  const usualTime = new Map<string, string>();
+  const missedYesterday = new Set<string>();
+  const tiny = new Map<string, string>();
+  for (const [id, p] of patterns) {
+    if (p.usualTime) usualTime.set(id, p.usualTime);
+    if (p.missedYesterday && p.missRun <= 2) missedYesterday.add(id);
+    const h = app.habits[id];
+    if (h) tiny.set(id, tinyVersion(h).label);
+  }
+  return {
+    usualTime,
+    missedYesterday,
+    tiny,
+    mood: user.mood,
+    easy: !!app.easyUntil && app.easyUntil >= snap.today,
+  };
+}
+
+export async function notifyAutoComplete(habit: Habit, detail: string, opts: { title?: string } = {}) {
   if (!supported || !useApp.getState().settings.autoAlerts) return;
   if ((await notificationPermission()) !== 'granted') return;
   await Notifications.scheduleNotificationAsync({
-    identifier: `auto:${habit.id}:${todayKey()}`,
+    identifier: `auto:${habit.id}:${todayKey()}${opts.title ? ':alt' : ''}`,
     content: {
-      title: `${habit.name} · done`,
+      title: opts.title ?? `${habit.name} · done`,
       body: detail,
       data: { type: 'auto', habitId: habit.id },
     },

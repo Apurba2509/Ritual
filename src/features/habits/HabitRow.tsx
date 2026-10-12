@@ -3,6 +3,7 @@ import { memo, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   interpolate,
@@ -15,8 +16,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
+import { tinyVersion } from '@/domain/behavior';
 import type { DayKey } from '@/domain/dates';
 import { progressOf, scheduleLabel } from '@/domain/habits';
+import { formatMinutes, MIN, screenMinutes } from '@/domain/screen';
+import { useApp } from '@/data/store';
+import { useScreen } from '@/features/screen';
 import type { Entry, Habit } from '@/domain/types';
 import { haptic } from '@/lib/haptics';
 import { Icon, isIconName } from '@/ui/Icon';
@@ -24,7 +29,7 @@ import { ProgressRing } from '@/ui/ProgressRing';
 import { Tap } from '@/ui/Tap';
 import { Text } from '@/ui/Text';
 import { tint, useTheme } from '@/ui/theme';
-import { addProgress, completeHabit, setProgress, toggleHabit } from './actions';
+import { addProgress, completeHabit, logTinyHabit, setProgress, toggleHabit } from './actions';
 import { autoIcon, formatAmount, formatProgress, stepFor } from './format';
 
 interface Props {
@@ -37,9 +42,12 @@ interface Props {
   index: number;
   onLongPress: (habit: Habit) => void;
   last?: boolean;
+  /** Easy mode: the two-minute version counts in full. */
+  easy?: boolean;
 }
 
 const SIZE = 36;
+const PRESS = { duration: 90, easing: Easing.out(Easing.quad) };
 const SWIPE_DONE = 84;
 
 /** Swipe right to complete (or to undo a done habit). Vertical scrolling still wins. */
@@ -59,7 +67,7 @@ function useSwipe(onCommit: () => void) {
     })
     .onEnd(() => {
       if (x.value > SWIPE_DONE) scheduleOnRN(onCommit);
-      x.value = withSpring(0, { damping: 18, stiffness: 220 });
+      x.value = withSpring(0, { damping: 26, stiffness: 260 });
       armed.value = 0;
     });
   const row = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
@@ -99,19 +107,24 @@ function Control({
   entry,
   day,
   onLongPress,
+  easy,
 }: {
   habit: Habit;
   entry: Entry | undefined;
   day: DayKey;
   onLongPress: () => void;
+  easy?: boolean;
 }) {
   const t = useTheme();
   const scale = useSharedValue(1);
   const pop = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const isCheck = habit.kind === 'check';
   const press = () => {
-    scale.value = withSequence(withTiming(0.82, { duration: 70 }), withSpring(1, { damping: 8, stiffness: 320 }));
-    if (isCheck) toggleHabit(habit.id, day);
+    scale.set(
+      withSequence(withTiming(0.88, PRESS), withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) })),
+    );
+    if (easy) logTinyHabit(habit.id, day);
+    else if (isCheck) toggleHabit(habit.id, day);
     else if (habit.kind === 'count') addProgress(habit.id, day, stepFor(habit));
     else router.push(`/focus/${habit.id}`);
   };
@@ -125,18 +138,30 @@ function Control({
       accessibilityRole={isCheck ? 'checkbox' : 'button'}
       accessibilityState={isCheck ? { checked: false } : undefined}
       accessibilityLabel={
-        isCheck
-          ? `Mark ${habit.name} as done`
-          : habit.kind === 'count'
-            ? `Add ${formatAmount(habit, stepFor(habit))} to ${habit.name}`
-            : `Start a focus timer for ${habit.name}`
+        easy
+          ? `Do the two-minute version of ${habit.name}`
+          : isCheck
+            ? `Mark ${habit.name} as done`
+            : habit.kind === 'count'
+              ? `Add ${formatAmount(habit, stepFor(habit))} to ${habit.name}`
+              : `Start a focus timer for ${habit.name}`
       }
     >
       <Animated.View style={[{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }, pop]}>
-        {isCheck ? (
+        {isCheck || easy ? (
           <View
-            style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: 2, borderColor: t.borderStrong }}
-          />
+            style={{
+              width: SIZE,
+              height: SIZE,
+              borderRadius: SIZE / 2,
+              borderWidth: 2,
+              borderColor: t.borderStrong,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {easy ? <Icon name="plant" size={14} color={t.textMuted} weight="fill" /> : null}
+          </View>
         ) : (
           <>
             <View style={{ position: 'absolute' }}>
@@ -150,6 +175,41 @@ function Control({
   );
 }
 
+/** Screen-limit habits measure themselves: show how much of today's allowance is used. */
+function ScreenMeter({ habit }: { habit: Habit }) {
+  const t = useTheme();
+  const today = useScreen((s) => s.days.find((d) => !d.final));
+  const guarded = useApp((s) => s.guard.apps);
+  if (habit.auto?.provider !== 'screen') return null;
+  const used = today ? screenMinutes(today, habit.auto.scope, new Set(guarded)) : 0;
+  const share = Math.min(1, used / Math.max(1, habit.auto.limitMin));
+  return (
+    <Tap
+      onPress={() => router.push('/screen-time')}
+      hitSlop={12}
+      accessibilityLabel={`${used} of ${habit.auto.limitMin} minutes used`}
+      style={{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }}
+    >
+      <View style={{ position: 'absolute' }}>
+        <ProgressRing
+          progress={share}
+          size={SIZE}
+          stroke={3}
+          duration={450}
+          color={share >= 1 ? t.danger : undefined}
+        />
+      </View>
+      <Icon name="hourglass-high" size={14} color={t.text} weight="bold" />
+    </Tap>
+  );
+}
+
+export function screenMeta(habit: Habit, todayUsedMs: number | null): string | null {
+  if (habit.auto?.provider !== 'screen') return null;
+  const limit = formatMinutes(habit.auto.limitMin * MIN);
+  return todayUsedMs === null ? `Limit ${limit}` : `${formatMinutes(todayUsedMs)} of ${limit}`;
+}
+
 /** A habit that still needs doing today. */
 export const HabitRow = memo(function HabitRow({
   habit,
@@ -161,19 +221,30 @@ export const HabitRow = memo(function HabitRow({
   index,
   onLongPress,
   last,
+  easy,
 }: Props) {
   const t = useTheme();
   const skipped = !!entry?.skipped && !entry.deleted;
   const value = entry && !entry.deleted ? entry.value : 0;
   const auto = autoIcon(habit.auto);
+  const isScreen = habit.auto?.provider === 'screen';
+  const tinyMode = !!easy && !isScreen;
+  const screenToday = useScreen((s) => s.days.find((d) => !d.final));
+  const guarded = useApp((s) => s.guard.apps);
   const swipe = useSwipe(() => {
-    haptic.success();
-    completeHabit(habit.id, day, 'manual');
+    if (isScreen) return;
+    if (tinyMode) logTinyHabit(habit.id, day);
+    else completeHabit(habit.id, day, 'manual');
   });
 
   const meta: string[] = [];
   if (skipped) meta.push('Rest day · streak protected');
-  else {
+  else if (isScreen && habit.auto?.provider === 'screen') {
+    const used = screenToday ? screenMinutes(screenToday, habit.auto.scope, new Set(guarded)) * MIN : null;
+    meta.push(screenMeta(habit, used)!);
+  } else if (tinyMode) {
+    meta.push(`Tiny: ${tinyVersion(habit).label}`);
+  } else {
     if (habit.kind !== 'check') meta.push(formatProgress(habit, value));
     if (weekProgress) meta.push(`${weekProgress.done} of ${weekProgress.target} this week`);
     else if (habit.kind === 'check') meta.push(scheduleLabel(habit.schedule));
@@ -183,7 +254,7 @@ export const HabitRow = memo(function HabitRow({
     <Animated.View
       entering={FadeIn.delay(Math.min(index, 8) * 35).duration(260)}
       exiting={FadeOut.duration(160)}
-      layout={LinearTransition.springify().damping(22)}
+      layout={LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}
     >
       <GestureDetector gesture={swipe.pan}>
         <View style={{ overflow: 'hidden' }}>
@@ -233,8 +304,10 @@ export const HabitRow = memo(function HabitRow({
                 <View style={{ width: SIZE, alignItems: 'center' }}>
                   <Icon name="moon" size={18} color={t.textFaint} />
                 </View>
+              ) : isScreen ? (
+                <ScreenMeter habit={habit} />
               ) : (
-                <Control habit={habit} entry={entry} day={day} onLongPress={() => onLongPress(habit)} />
+                <Control habit={habit} entry={entry} day={day} onLongPress={() => onLongPress(habit)} easy={tinyMode} />
               )}
             </Tap>
           </Animated.View>
@@ -260,11 +333,17 @@ export const DoneRow = memo(function DoneRow({
   onLongPress: (habit: Habit) => void;
 }) {
   const t = useTheme();
-  const undo = () => (habit.kind === 'check' ? toggleHabit(habit.id, day) : setProgress(habit.id, day, 0));
+  // Screen limits are measured, not ticked: there's nothing to undo by hand.
+  const undo = () =>
+    habit.auto?.provider === 'screen'
+      ? undefined
+      : habit.kind === 'check'
+        ? toggleHabit(habit.id, day)
+        : setProgress(habit.id, day, 0);
   const swipe = useSwipe(undo);
   const scale = useSharedValue(0.6);
   useEffect(() => {
-    scale.value = withSpring(1, { damping: 7, stiffness: 300 });
+    scale.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
   }, [scale]);
   const pop = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const value = entry && !entry.deleted ? entry.value : 0;

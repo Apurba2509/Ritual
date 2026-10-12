@@ -24,6 +24,7 @@ class BootReceiver : BroadcastReceiver() {
               StepWorker.schedule(context)
               Sensors.snapshot(context)
             }
+            if (ScreenTime.isEnabled(context)) StepWorker.schedule(context)
             if (ActivityDetection.isEnabled(context)) ActivityDetection.start(context)
           }
         }

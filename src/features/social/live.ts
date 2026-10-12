@@ -43,23 +43,51 @@ export function friendUids(uid: string, friendships: Friendship[]) {
 }
 
 let unsubs: Unsubscribe[] = [];
-let feedUnsub: Unsubscribe | null = null;
+let feedUnsubs: Unsubscribe[] = [];
 let feedKey = '';
+
+/** Firestore's `in` filter takes at most 30 values per query. */
+const IN_LIMIT = 30;
+const FEED_SIZE = 60;
 let progressTimer: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * The feed: recent activity from you and your friends. Friends are split into groups of 30
+ * (Firestore's `in` limit) with one listener each, merged newest-first. At real scale this
+ * becomes a per-user feed written by a Cloud Function (fan-out on write); see README.
+ */
 function listenFeed(uid: string) {
   const fb = firebase();
   if (!fb) return;
-  const ids = [uid, ...friendUids(uid, useSocial.getState().friendships)].slice(0, 30);
-  const key = ids.sort().join(',');
+  const ids = [uid, ...friendUids(uid, useSocial.getState().friendships)].sort();
+  const key = ids.join(',');
   if (key === feedKey) return;
   feedKey = key;
-  feedUnsub?.();
-  feedUnsub = onSnapshot(
-    query(collection(fb.db, 'activity'), where('uid', 'in', ids), orderBy('createdAt', 'desc'), limit(60)),
-    (snap) => useSocial.setState({ feed: snap.docs.map((d) => toActivity(d.id, d.data())) }),
-    (err) => __DEV__ && console.warn('[social] feed', err.message),
-  );
+  for (const u of feedUnsubs) u();
+  feedUnsubs = [];
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += IN_LIMIT) chunks.push(ids.slice(i, i + IN_LIMIT));
+  const parts: Activity[][] = chunks.map(() => []);
+  const publish = () => {
+    const merged = parts
+      .flat()
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, FEED_SIZE);
+    useSocial.setState({ feed: merged });
+  };
+  chunks.forEach((chunk, i) => {
+    feedUnsubs.push(
+      onSnapshot(
+        query(collection(fb.db, 'activity'), where('uid', 'in', chunk), orderBy('createdAt', 'desc'), limit(FEED_SIZE)),
+        (snap) => {
+          parts[i] = snap.docs.map((d) => toActivity(d.id, d.data()));
+          publish();
+        },
+        (err) => __DEV__ && console.warn('[social] feed', err.message),
+      ),
+    );
+  });
 }
 
 function start(uid: string) {
@@ -157,8 +185,8 @@ function publishProgress() {
 function stop() {
   unsubs.forEach((u) => u());
   unsubs = [];
-  feedUnsub?.();
-  feedUnsub = null;
+  for (const u of feedUnsubs) u();
+  feedUnsubs = [];
   feedKey = '';
   useSocial.setState({ friendships: [], profiles: {}, feed: [], inbox: [], ready: false });
 }

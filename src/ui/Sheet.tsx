@@ -43,13 +43,13 @@ export function Sheet({ visible, onClose, title, subtitle, children, scroll = tr
   const pan = Gesture.Pan()
     .activeOffsetY(8)
     .onUpdate((e) => {
-      y.value = Math.max(0, e.translationY);
+      y.set(Math.max(0, e.translationY));
     })
     .onEnd((e) => {
       if (e.translationY > 120 || e.velocityY > 900) {
         scheduleOnRN(onClose);
       } else {
-        y.value = withSpring(0, { damping: 20, stiffness: 240 });
+        y.set(withSpring(0, { damping: 20, stiffness: 240 }));
       }
     });
 

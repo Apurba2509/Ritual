@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mindful pause. Only window changes, never window content: Ritual learns which app came to the
+  front (to show the pause before apps you chose) and nothing else.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+  android:accessibilityEventTypes="typeWindowStateChanged"
+  android:accessibilityFeedbackType="feedbackGeneric"
+  android:accessibilityFlags="flagDefault"
+  android:canRetrieveWindowContent="false"
+  android:notificationTimeout="100"
+  android:description="@string/ritual_gate_description"
+  android:summary="@string/ritual_gate_summary" />

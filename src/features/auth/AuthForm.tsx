@@ -170,7 +170,7 @@ export function AuthForm({ initialMode = 'signIn' }: { initialMode?: AuthMode })
       ) : null}
       {signingUp ? (
         <Text variant="caption" tone="faint" align="center" style={{ marginTop: 4 }}>
-          You'll get a username automatically — change it any time.
+          You’ll get a username automatically — change it any time.
         </Text>
       ) : null}
     </View>

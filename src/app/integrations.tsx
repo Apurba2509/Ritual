@@ -11,7 +11,13 @@ import { aiConfigured } from '@/features/ai/gemini';
 import { timeAgo } from '@/features/habits/format';
 import { HabitIcon } from '@/features/habits/HabitIcon';
 import { runAutoTracking, syncHabitNow } from '@/features/integrations/engine';
-import { fetchGithubDaily, isValidGithubUsername } from '@/features/integrations/github';
+import {
+  fetchGithubDaily,
+  getGithubToken,
+  githubTokenSupported,
+  isValidGithubUsername,
+  setGithubToken,
+} from '@/features/integrations/github';
 import { healthAvailability, healthSupported, requestHealthPermissions } from '@/features/integrations/health';
 import { fetchLeetcodeDaily, leetcodeSupported } from '@/features/integrations/leetcode';
 import {
@@ -26,6 +32,7 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Pill } from '@/ui/Chip';
 import { Icon, IconName } from '@/ui/Icon';
+import { Tap } from '@/ui/Tap';
 import { ListGroup, ListRow } from '@/ui/ListRow';
 import { Screen, Section } from '@/ui/Screen';
 import { Text } from '@/ui/Text';
@@ -287,6 +294,21 @@ function AccountIntegration({
   const [username, setUsername] = useState(state?.username ?? '');
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ days: number; total: number } | null>(null);
+  const withToken = provider === 'github' && githubTokenSupported;
+  const [hasToken, setHasToken] = useState(false);
+  const [tokenOpen, setTokenOpen] = useState(false);
+  const [token, setToken] = useState('');
+  useEffect(() => {
+    if (withToken) getGithubToken().then((v) => setHasToken(!!v));
+  }, [withToken]);
+
+  const saveToken = async (value: string | null) => {
+    await setGithubToken(value);
+    setHasToken(!!value);
+    setToken('');
+    setTokenOpen(false);
+    toast(value ? 'Token saved on this phone' : 'Token removed', { icon: 'key', tone: 'success' });
+  };
 
   const connect = async () => {
     const u = username.trim().replace(/^@/, '');
@@ -348,6 +370,44 @@ function AccountIntegration({
             variant={state ? 'secondary' : 'primary'}
             full
           />
+          {withToken ? (
+            tokenOpen ? (
+              <View style={{ gap: 10 }}>
+                <TextField
+                  icon="key"
+                  value={token}
+                  onChangeText={setToken}
+                  placeholder="github_pat_…"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry
+                  hint="GitHub → Settings → Developer settings → Fine-grained tokens. No permissions are needed for public work. Stored encrypted on this phone only, never synced."
+                />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Button title="Save token" size="sm" disabled={!token.trim()} onPress={() => saveToken(token)} />
+                  <Button title="Cancel" size="sm" variant="ghost" onPress={() => setTokenOpen(false)} />
+                </View>
+              </View>
+            ) : (
+              <Tap onPress={() => setTokenOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="key" size={14} color={t.textMuted} />
+                <Text variant="caption" tone="muted" style={{ flex: 1 }}>
+                  {hasToken
+                    ? 'Using your GitHub token (official API)'
+                    : 'Add a GitHub token for the most reliable sync'}
+                </Text>
+                {hasToken ? (
+                  <Tap onPress={() => saveToken(null)} hitSlop={8}>
+                    <Text variant="caption" weight="bold">
+                      Remove
+                    </Text>
+                  </Tap>
+                ) : (
+                  <Icon name="caret-right" size={14} color={t.textMuted} />
+                )}
+              </Tap>
+            )
+          ) : null}
         </>
       )}
       {linked.map((h) => (

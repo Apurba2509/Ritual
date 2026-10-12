@@ -37,7 +37,7 @@ export default function WelcomeScreen() {
       <WelcomeHero width={width} />
 
       <View style={{ paddingHorizontal: 24, gap: 22 }}>
-        <Animated.View entering={FadeInUp.delay(250).springify().damping(18)} style={{ gap: 12 }}>
+        <Animated.View entering={FadeInUp.delay(250).duration(420)} style={{ gap: 12 }}>
           <Text variant="display" size={headline} style={{ lineHeight: headline * 1.04 }}>
             Habits that{'\n'}track themselves.
           </Text>
@@ -46,7 +46,7 @@ export default function WelcomeScreen() {
           </Text>
         </Animated.View>
 
-        <Animated.View entering={FadeInUp.delay(400).springify().damping(18)} style={{ gap: 10 }}>
+        <Animated.View entering={FadeInUp.delay(400).duration(420)} style={{ gap: 10 }}>
           {isFirebaseConfigured ? (
             <>
               <GoogleButton onError={setError} />

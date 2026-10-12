@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { habitIconKey, tintKey } from '@/domain/catalog';
-import type { DayKey, WeekStart } from '@/domain/dates';
+import { addDays, DayKey, todayKey, WeekStart } from '@/domain/dates';
 import type { NotifyStyle } from '@/domain/notifications';
 import { buildDemoHistory, DEMO_HABITS } from '@/domain/demo';
 import { computeSnapshot } from '@/domain/snapshot';
 import { isEntryDone } from '@/domain/habits';
+import { Adjustment, tinyVersion } from '@/domain/behavior';
 import { CategoryId, Entry, entryId, EntrySource, Habit, Mood, Workout } from '@/domain/types';
 import { monotonicNow, newId } from '@/lib/ids';
 import { zustandStorage } from '@/lib/storage';
@@ -52,6 +53,30 @@ export interface IntegrationState {
   health: { lastSyncAt: number | null; error: string | null } | null;
 }
 
+/** Mindful pause + screen time setup. Device-specific (package names), so it isn't synced. */
+export interface GuardConfig {
+  enabled: boolean;
+  apps: string[];
+  /** Windows where guarded apps open freely — a scheduled outlet for FOMO. */
+  catchups: { start: string; end: string }[];
+  bedtime: { enabled: boolean; start: string; end: string };
+  allowMinutes: number;
+  /** Habit offered as the swap on the pause screen ("2 minutes of reading instead"). */
+  swapHabitId: string | null;
+}
+
+export const DEFAULT_GUARD: GuardConfig = {
+  enabled: false,
+  apps: [],
+  catchups: [
+    { start: '12:30', end: '13:00' },
+    { start: '19:00', end: '19:30' },
+  ],
+  bedtime: { enabled: true, start: '23:00', end: '06:00' },
+  allowMinutes: 5,
+  swapHabitId: null,
+};
+
 export type NewHabit = Omit<Habit, 'id' | 'createdAt' | 'updatedAt' | 'order' | 'archived' | 'deleted'> &
   Partial<Pick<Habit, 'order'>>;
 
@@ -82,6 +107,11 @@ interface AppState {
   social: { friends: number; challengesJoined: number };
   integrations: IntegrationState;
   aiLogs: number;
+  /** Easy mode: until this day (inclusive) the two-minute version of every habit counts in full. */
+  easyUntil: DayKey | null;
+  /** Coach cards the person waved away: key → hidden until (ms). */
+  coachDismissed: Record<string, number>;
+  guard: GuardConfig;
 
   // habits
   createHabit: (h: NewHabit) => string;
@@ -89,6 +119,8 @@ interface AppState {
   archiveHabit: (id: string, archived: boolean) => void;
   deleteHabit: (id: string) => void;
   reorderHabits: (ids: string[]) => void;
+  /** Accept a coach suggestion to make a goal lighter or heavier. */
+  applyAdjustment: (adj: Adjustment) => void;
 
   // entries
   setEntry: (
@@ -103,6 +135,15 @@ interface AppState {
   setPhoto: (habitId: string, date: DayKey, photoUrl: string | null) => void;
   /** Merge values reported by an integration (never lowers a manually logged value). */
   mergeAutoEntries: (habitId: string, values: Record<DayKey, number>, source: EntrySource) => number;
+  /** Log the two-minute version: the day is held to the tiny goal and counts as done. */
+  logTiny: (habitId: string, date: DayKey, source?: EntrySource) => EntryChange | null;
+
+  // coach
+  setEasyMode: (days: number | null) => void;
+  dismissCoach: (key: string, days: number) => void;
+  updateGuard: (patch: Partial<GuardConfig>) => void;
+  /** Write exact values for auto-measured days (screen limits can flip from held to over). */
+  setAutoEntries: (habitId: string, values: Record<DayKey, number>, source: EntrySource) => number;
 
   // workouts
   /** Add or replace recorded workouts (idempotent by id). Returns how many were new. */
@@ -209,9 +250,17 @@ export const useApp = create<AppState>()(
                 updatedAt: stored?.updatedAt ?? 0,
               };
         const patch = build(prev);
+        // Record the goal this day is held to, so later target changes never rewrite history.
+        const goal =
+          typeof patch.goal === 'number' && patch.goal > 0
+            ? patch.goal
+            : typeof prev.goal === 'number' && prev.goal > 0
+              ? prev.goal
+              : habit.target;
         const next: Entry = {
           ...prev,
           ...patch,
+          goal,
           value: Math.max(0, Math.round((patch.value ?? prev.value) * 100) / 100),
           deleted: false,
           updatedAt: Math.max(monotonicNow(), prev.updatedAt + 1),
@@ -252,6 +301,9 @@ export const useApp = create<AppState>()(
         social: { friends: 0, challengesJoined: 0 },
         integrations: EMPTY_INTEGRATIONS,
         aiLogs: 0,
+        easyUntil: null,
+        coachDismissed: {},
+        guard: DEFAULT_GUARD,
 
         // ── habits ──
         createHabit: (input) => {
@@ -276,6 +328,27 @@ export const useApp = create<AppState>()(
             habits: { ...s.habits, [id]: next },
             outbox: enqueue(s.outbox, 'habit', id, updatedAt),
           }));
+          // Today follows the new target (past days keep the goal they were held to).
+          if (patch.target !== undefined && patch.target !== prev.target) {
+            const today = todayKey();
+            const e = get().entries[entryId(id, today)];
+            if (e && !e.deleted && (e.goal == null || e.goal === prev.target)) {
+              writeEntry(id, today, () => ({ goal: patch.target }), e.source);
+            }
+          }
+        },
+
+        applyAdjustment: (adj) => {
+          const prev = get().habits[adj.habitId];
+          if (!prev) return;
+          const patch: Partial<Habit> = { adjustedAt: Date.now() };
+          if (adj.target !== undefined) {
+            patch.target = adj.target;
+            // Lowering a goal remembers where you were heading, so the coach can climb back.
+            if (adj.direction === 'easier' && !prev.goalTarget) patch.goalTarget = prev.target;
+          }
+          if (adj.schedule) patch.schedule = adj.schedule;
+          get().updateHabit(adj.habitId, patch);
         },
 
         archiveHabit: (id, archived) => get().updateHabit(id, { archived }),
@@ -349,6 +422,43 @@ export const useApp = create<AppState>()(
               writeEntry(habitId, date, () => ({ value }), source);
               changed++;
             }
+          }
+          return changed;
+        },
+
+        logTiny: (habitId, date, source = 'manual') => {
+          const habit = get().habits[habitId];
+          if (!habit) return null;
+          const tiny = tinyVersion(habit);
+          return writeEntry(
+            habitId,
+            date,
+            (prev) => ({ value: Math.max(prev.value, tiny.amount), goal: tiny.amount, skipped: false }),
+            source,
+          );
+        },
+
+        // ── coach ──
+        setEasyMode: (days) => set({ easyUntil: days && days > 0 ? addDays(todayKey(), days - 1) : null }),
+        dismissCoach: (key, days) =>
+          set((s) => {
+            const now = Date.now();
+            // Drop expired dismissals so this never grows without bound.
+            const kept = Object.fromEntries(Object.entries(s.coachDismissed).filter(([, until]) => until > now));
+            return { coachDismissed: { ...kept, [key]: now + days * 86_400_000 } };
+          }),
+
+        updateGuard: (patch) => set((s) => ({ guard: { ...s.guard, ...patch } })),
+
+        setAutoEntries: (habitId, values, source) => {
+          let changed = 0;
+          for (const [date, value] of Object.entries(values)) {
+            const prev = get().entries[entryId(habitId, date)];
+            if (prev && !prev.deleted && prev.skipped) continue; // an intentional rest day wins
+            const current = prev && !prev.deleted ? prev.value : 0;
+            if (current === value) continue;
+            writeEntry(habitId, date, () => ({ value }), source);
+            changed++;
           }
           return changed;
         },
@@ -442,6 +552,8 @@ export const useApp = create<AppState>()(
             demo: false,
             outbox: {},
             aiLogs: 0,
+            easyUntil: null,
+            coachDismissed: {},
             settings: s.settings,
           })),
         setSocialCounts: (patch) => set((s) => ({ social: { ...s.social, ...patch } })),
@@ -531,13 +643,15 @@ export const useApp = create<AppState>()(
             social: { friends: 0, challengesJoined: 0 },
             integrations: EMPTY_INTEGRATIONS,
             aiLogs: 0,
+            easyUntil: null,
+            coachDismissed: {},
             settings: s.settings,
           })),
       };
     },
     {
       name: 'ritual-app',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => zustandStorage),
       migrate: (persisted, version) => {
         const state = persisted as Partial<AppState>;
@@ -550,6 +664,9 @@ export const useApp = create<AppState>()(
         }
         // New settings get their defaults without touching the ones people already chose.
         state.settings = { ...DEFAULT_SETTINGS, ...(state.settings ?? {}) };
+        state.easyUntil = state.easyUntil ?? null;
+        state.coachDismissed = state.coachDismissed ?? {};
+        state.guard = { ...DEFAULT_GUARD, ...(state.guard ?? {}) };
         return state as AppState;
       },
       partialize: ({
@@ -569,6 +686,9 @@ export const useApp = create<AppState>()(
         social,
         integrations,
         aiLogs,
+        easyUntil,
+        coachDismissed,
+        guard,
       }) => ({
         habits,
         entries,
@@ -586,6 +706,9 @@ export const useApp = create<AppState>()(
         social,
         integrations,
         aiLogs,
+        easyUntil,
+        coachDismissed,
+        guard,
       }),
     },
   ),

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { niceAmount } from '@/domain/behavior';
 import { TEMPLATE_BY_ID } from '@/domain/catalog';
 import { scheduleLabel } from '@/domain/habits';
 import { useHabitList } from '@/data/hooks';
@@ -38,18 +39,26 @@ function localPlan(goal: string): CoachPlan {
   const pick = (ids: string[]) =>
     ids
       .map((id) => TEMPLATE_BY_ID.get(id)!)
-      .map<CoachHabit>((tpl) => ({
-        name: tpl.name,
-        icon: tpl.icon,
-        kind: tpl.kind,
-        target: tpl.target,
-        unit: tpl.unit,
-        schedule: tpl.schedule,
-        difficulty: tpl.difficulty,
-        reminder: '09:00',
-        why: 'A proven starter habit for this goal.',
-        color: tpl.color,
-      }));
+      .map<CoachHabit>((tpl) => {
+        // Same ladder as the AI plan: start at ~40% of the template's goal and build up.
+        const start =
+          tpl.kind === 'check' ? 1 : niceAmount(tpl, Math.max(tpl.kind === 'duration' ? 2 : 1, tpl.target * 0.4));
+        return {
+          name: tpl.name,
+          icon: tpl.icon,
+          kind: tpl.kind,
+          target: start,
+          goalTarget: start < tpl.target ? tpl.target : null,
+          tiny: null,
+          cue: null,
+          unit: tpl.unit,
+          schedule: tpl.schedule,
+          difficulty: tpl.difficulty,
+          reminder: '09:00',
+          why: 'A proven starter habit for this goal.',
+          color: tpl.color,
+        };
+      });
   if (/run|10k|marathon|fit|cardio|weight|muscle|gym/.test(g))
     return {
       title: 'Fitness foundation',
@@ -137,6 +146,9 @@ export default function CoachScreen() {
         difficulty: h.difficulty,
         intention: h.why,
         challengeId: null,
+        goalTarget: h.goalTarget,
+        tiny: h.tiny,
+        cue: h.cue,
       });
       n++;
     });
@@ -150,7 +162,7 @@ export default function CoachScreen() {
     <Screen
       back="close"
       title="AI coach"
-      subtitle="Describe a goal. The coach designs a few small, specific habits that compound toward it."
+      subtitle="Describe a goal. The coach breaks it into a few small habits that start easy and build up."
     >
       <TextField
         value={goal}
@@ -202,7 +214,7 @@ export default function CoachScreen() {
       ) : null}
 
       {plan ? (
-        <Animated.View entering={FadeInDown.springify().damping(18)} style={{ gap: 12 }}>
+        <Animated.View entering={FadeInDown.duration(300)} style={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text variant="heading" style={{ flex: 1 }}>
               {plan.title}
@@ -243,9 +255,19 @@ export default function CoachScreen() {
                 <View style={{ flex: 1, gap: 3 }}>
                   <Text variant="subheading">{h.name}</Text>
                   <Text variant="caption" tone="muted">
-                    {h.kind === 'check' ? 'Yes/No' : formatAmount(h, h.target)} · {scheduleLabel(h.schedule)}
+                    {h.kind === 'check'
+                      ? 'Yes/No'
+                      : h.goalTarget
+                        ? `Start at ${formatAmount(h, h.target)} → ${formatAmount(h, h.goalTarget)}`
+                        : formatAmount(h, h.target)}{' '}
+                    · {scheduleLabel(h.schedule)}
                     {h.reminder ? ` · ${formatTime(h.reminder)}` : ''}
                   </Text>
+                  {h.cue ? (
+                    <Text variant="caption" tone="muted">
+                      {h.cue}
+                    </Text>
+                  ) : null}
                   <Text variant="caption" tone="faint">
                     {h.why}
                   </Text>

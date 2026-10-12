@@ -8,10 +8,11 @@ import {
   isEntryDone,
   isEntrySkipped,
   isScheduledOn,
+  isTinyEntry,
   StreakInfo,
 } from './habits';
 import type { Entry, EntryIndex, Habit } from './types';
-import { completionXP, levelProgress, milestoneBonus } from './xp';
+import { completionXP, levelProgress, luckyBonus, milestoneBonus, tinyXP } from './xp';
 
 export interface HabitStats {
   habit: Habit;
@@ -92,7 +93,9 @@ export function computeSnapshot(input: SnapshotInput): Snapshot {
       if (!isEntryDone(habit, entry)) continue;
       totalDone++;
       const run = streak.runByDay.get(day) ?? 1;
-      const gained = completionXP(habit.difficulty, run) + milestoneBonus(streak.unit, run);
+      const base = completionXP(habit.difficulty, run);
+      const gained =
+        (isTinyEntry(habit, entry) ? tinyXP(base) : base) + milestoneBonus(streak.unit, run) + luckyBonus(entry.id);
       xp += gained;
       if (day >= weekBegin && day <= today) weeklyXP += gained;
 

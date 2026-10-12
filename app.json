@@ -2,12 +2,12 @@
   "expo": {
     "name": "Ritual",
     "slug": "Ritual",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ritual",
     "userInterfaceStyle": "automatic",
-    "description": "The habit tracker that tracks itself — auto-tracking from GitHub, LeetCode and Health Connect, AI quick logging, streaks, XP and friends.",
+    "description": "Habits that track themselves: phone sensing (steps, walks, runs, screen time) that works offline with the app closed, an on-device behaviour coach that adapts your goals, a mindful pause before distracting apps, AI logging, streaks, XP and friends.",
     "ios": {
       "icon": "./assets/images/icon.png",
       "supportsTablet": false,
@@ -42,17 +42,15 @@
         "android.permission.WAKE_LOCK",
         "android.permission.RECORD_AUDIO"
       ],
-      "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW"
-      ]
+      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"]
     },
     "web": {
       "output": "single",
       "favicon": "./assets/images/favicon.png",
       "name": "Ritual — the habit tracker that tracks itself",
       "shortName": "Ritual",
-      "themeColor": "#0A0A0F",
-      "backgroundColor": "#0A0A0F"
+      "themeColor": "#0B0B0C",
+      "backgroundColor": "#0B0B0C"
     },
     "plugins": [
       "expo-router",
@@ -104,19 +102,13 @@
         {
           "microphonePermission": "Ritual uses the microphone so you can log habits by saying what you did.",
           "speechRecognitionPermission": "Ritual turns what you say into habit check-ins.",
-          "androidSpeechServicePackages": [
-            "com.google.android.googlequicksearchbox",
-            "com.google.android.tts"
-          ]
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox", "com.google.android.tts"]
         }
       ],
       [
         "react-native-android-widget",
         {
-          "fonts": [
-            "./assets/fonts/InterTight_700Bold.ttf",
-            "./assets/fonts/InterTight_500Medium.ttf"
-          ],
+          "fonts": ["./assets/fonts/InterTight_700Bold.ttf", "./assets/fonts/InterTight_500Medium.ttf"],
           "widgets": [
             {
               "name": "Today",
@@ -131,7 +123,8 @@
             }
           ]
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

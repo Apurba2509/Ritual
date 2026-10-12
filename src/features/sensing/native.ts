@@ -13,6 +13,46 @@ export interface SensingCapabilities {
   /** ms epoch of the last step-counter reading (0 = never). */
   lastStepSnapshotAt: number;
   workoutActive: boolean;
+  usageAccess: boolean;
+  screenTimeEnabled: boolean;
+  pauseServiceEnabled: boolean;
+  sdk: number;
+  manufacturer: string;
+}
+
+/** One day of phone use, reconstructed from Android's usage log. */
+export interface ScreenDay {
+  day: string;
+  totalMs: number;
+  pickups: number;
+  firstPickupAt: number;
+  lastUseAt: number;
+  longestMs: number;
+  /** ms per hour of the day (24 buckets) */
+  hourly: number[];
+  apps: { pkg: string; ms: number; opens: number }[];
+  /** The day is over (not today). */
+  final: boolean;
+  /** From Android's daily totals because the event log was empty (no hourly detail). */
+  estimated?: boolean;
+}
+
+export interface AppInfo {
+  pkg: string;
+  label: string;
+  category: 'social' | 'video' | 'game' | 'news' | 'audio' | 'image' | 'maps' | 'productivity' | 'other';
+  distracting: boolean;
+  /** data: URI (PNG) */
+  icon?: string;
+}
+
+export interface PauseEvent {
+  t: number;
+  type: 'shown' | 'timesup' | 'closed' | 'left' | 'opened' | 'swap';
+  pkg: string;
+  intent?: string;
+  minutes?: number;
+  habitId?: string;
 }
 
 export interface LiveWorkout {
@@ -65,6 +105,17 @@ interface RitualSensingNative {
   workoutState(): LiveWorkout | null;
   consumeFinishedWorkouts(): FinishedWorkout[];
   openBatterySettings(): void;
+  openUsageAccessSettings(): void;
+  setScreenTimeEnabled(on: boolean): void;
+  screenDays(days: number): Promise<ScreenDay[]>;
+  appInfo(pkgs: string[], withIcons: boolean): Promise<AppInfo[]>;
+  distractingApps(withIcons: boolean): Promise<AppInfo[]>;
+  setPauseConfig(json: string): void;
+  pauseEvents(sinceMs: number): PauseEvent[];
+  openAccessibilitySettings(): void;
+  openAppDetails(): void;
+  previewPause(pkg: string): void;
+  openAutostartSettings(): boolean;
 }
 
 export const RitualSensing: RitualSensingNative | null =

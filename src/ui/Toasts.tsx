@@ -22,7 +22,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 
   return (
     <Animated.View
-      entering={FadeInUp.springify().damping(18)}
+      entering={FadeInUp.duration(240)}
       exiting={FadeOutUp.duration(180)}
       layout={LinearTransition}
       style={{ alignItems: 'center' }}

@@ -93,7 +93,7 @@ export default function QuickLogScreen() {
       <Animated.View entering={FadeIn.duration(160)} style={{ flex: 1, backgroundColor: t.overlay }}>
         <Pressable style={{ flex: 1 }} onPress={() => router.back()} accessibilityLabel="Close" />
         <Animated.View
-          entering={FadeInUp.springify().damping(18)}
+          entering={FadeInUp.duration(260)}
           style={{
             position: 'absolute',
             top: insets.top + 12,
@@ -202,7 +202,7 @@ export default function QuickLogScreen() {
             ) : null}
 
             {plan ? (
-              <Animated.View entering={FadeInDown.springify().damping(18)} style={{ gap: 10 }}>
+              <Animated.View entering={FadeInDown.duration(260)} style={{ gap: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text variant="label" tone="muted" style={{ flex: 1 }}>
                     {plan.logs.length ? 'Here’s what I got' : 'No matching habits'}

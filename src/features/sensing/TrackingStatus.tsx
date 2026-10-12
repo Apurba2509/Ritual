@@ -24,7 +24,6 @@ import {
   enableAutoSensing,
   liveWorkout,
   LiveWorkout,
-  openBatterySettings,
   refreshSensing,
   sensingSupported,
   useSensing,
@@ -216,6 +215,17 @@ export function TrackingSheet({ visible, onClose }: { visible: boolean; onClose:
           detail={caps?.activityDetectionEnabled ? 'On · Android tells Ritual when you start moving' : 'Off'}
         />
         <Status
+          ok={!!caps?.usageAccess}
+          label="Screen time"
+          detail={
+            caps?.usageAccess
+              ? caps.pauseServiceEnabled
+                ? 'On · mindful pause active for guarded apps'
+                : 'On · read from Android’s usage log'
+              : 'Off'
+          }
+        />
+        <Status
           ok={on}
           label="Background checks"
           detail={on ? 'About every 15 minutes, even with the app closed' : 'Off'}
@@ -226,8 +236,11 @@ export function TrackingSheet({ visible, onClose }: { visible: boolean; onClose:
             icon="warning"
             iconColor={t.warning}
             title="Battery saver may pause it"
-            subtitle="Allow Ritual to run unrestricted"
-            onPress={openBatterySettings}
+            subtitle="See how to keep Ritual running on this phone"
+            onPress={() => {
+              onClose();
+              setTimeout(() => router.push('/reliability'), 200);
+            }}
             last
           />
         ) : null}

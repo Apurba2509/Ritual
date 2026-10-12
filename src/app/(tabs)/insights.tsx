@@ -261,7 +261,7 @@ export default function InsightsScreen() {
 
       <Section title="AI weekly review">
         {review ? (
-          <Animated.View entering={FadeInDown.springify().damping(18)}>
+          <Animated.View entering={FadeInDown.duration(300)}>
             <Card style={{ gap: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Icon name="sparkle" size={18} color={t.accentInk} weight="fill" />

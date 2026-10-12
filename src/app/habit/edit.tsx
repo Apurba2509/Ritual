@@ -10,7 +10,6 @@ import {
   TEMPLATES,
 } from '@/domain/catalog';
 import { orderedWeekdays, WEEKDAY_SHORT } from '@/domain/dates';
-import { scheduleLabel } from '@/domain/habits';
 import type {
   AutoSource,
   CategoryId,
@@ -19,11 +18,12 @@ import type {
   HabitKind,
   HealthMetric,
   Schedule,
+  ScreenScope,
 } from '@/domain/types';
+import { niceAmount, tinyVersion } from '@/domain/behavior';
 import { BASE_XP } from '@/domain/xp';
 import { useApp } from '@/data/store';
 import { toast } from '@/data/ui';
-import { formatAmount } from '@/features/habits/format';
 import { HabitIcon } from '@/features/habits/HabitIcon';
 import { formatTime, IconSheet, TimeSheet } from '@/features/habits/pickers';
 import { autoForTemplate } from '@/features/integrations/autoFor';
@@ -32,9 +32,9 @@ import { isValidGithubUsername } from '@/features/integrations/github';
 import { healthSupported, requestHealthPermissions } from '@/features/integrations/health';
 import { leetcodeSupported } from '@/features/integrations/leetcode';
 import { rescheduleSoon, requestNotificationPermission } from '@/features/notifications/scheduler';
+import { enableScreenTime, screenSupported } from '@/features/screen';
 import { enableAutoSensing, sensingSupported } from '@/features/sensing';
 import { Button } from '@/ui/Button';
-import { Card } from '@/ui/Card';
 import { Chip } from '@/ui/Chip';
 import { Icon, IconName, isIconName } from '@/ui/Icon';
 import { Screen, Section } from '@/ui/Screen';
@@ -44,14 +44,18 @@ import { Text } from '@/ui/Text';
 import { TextField } from '@/ui/TextField';
 import { tint, useTheme } from '@/ui/theme';
 
-type AutoChoice = 'none' | 'github' | 'leetcode' | HealthMetric | `dev-${DeviceMetric}`;
+type AutoChoice = 'none' | 'github' | 'leetcode' | HealthMetric | `dev-${DeviceMetric}` | `screen-${ScreenScope}`;
 
 function autoToChoice(a: AutoSource | null): AutoChoice {
   if (!a) return 'none';
   if (a.provider === 'health') return a.metric;
   if (a.provider === 'device') return `dev-${a.metric}`;
+  if (a.provider === 'screen') return `screen-${a.scope}`;
   return a.provider;
 }
+
+/** When-then plans ("After my coffee, I read") make follow-through far more likely. */
+const CUES = ['After I wake up', 'After my morning coffee', 'After lunch', 'When I get home', 'Before bed'];
 
 function templateChoice(tpl: HabitTemplate | undefined): AutoChoice {
   if (!tpl) return 'none';
@@ -81,6 +85,13 @@ export default function EditHabitScreen() {
   const [category, setCategory] = useState<CategoryId | null>(seed?.category ?? null);
   const [reminders, setReminders] = useState<string[]>(existing?.reminders ?? (template ? ['09:00'] : []));
   const [intention, setIntention] = useState(existing?.intention ?? '');
+  const [cue, setCue] = useState(existing?.cue ?? '');
+  const [tiny, setTiny] = useState(existing?.tiny ?? '');
+  const [limit, setLimit] = useState(
+    String(existing?.auto?.provider === 'screen' ? existing.auto.limitMin : (template?.screen?.limitMin ?? 120)),
+  );
+  const [ladder, setLadder] = useState(!!existing?.goalTarget && existing.goalTarget > existing.target);
+  const [goal, setGoal] = useState(existing?.goalTarget ? String(existing.goalTarget) : '');
   const [autoChoice, setAutoChoice] = useState<AutoChoice>(
     existing ? autoToChoice(existing.auto) : templateChoice(template),
   );
@@ -108,7 +119,8 @@ export default function EditHabitScreen() {
     setSchedule(tpl.schedule);
     setDifficulty(tpl.difficulty);
     setCategory(tpl.category);
-    if (!reminders.length) setReminders(['09:00']);
+    if (tpl.screen) setLimit(String(tpl.screen.limitMin));
+    if (!reminders.length && !tpl.screen) setReminders(['09:00']);
     const choice = templateChoice(tpl);
     setAutoChoice(choice);
     if (choice === 'github' || choice === 'leetcode') {
@@ -118,14 +130,19 @@ export default function EditHabitScreen() {
   };
 
   const targetNum = Math.max(1, Number(target.replace(',', '.')) || 1);
+  const limitNum = Math.max(5, Math.round(Number(limit) || 120));
+  const goalNum = Math.max(0, Number(goal.replace(',', '.')) || 0);
+  const isScreen = autoChoice.startsWith('screen-');
   const autoSource: AutoSource | null = useMemo((): AutoSource | null => {
     if (autoChoice === 'none') return null;
     if (autoChoice === 'github' || autoChoice === 'leetcode') {
       return autoUser.trim() ? { provider: autoChoice, username: autoUser.trim() } : null;
     }
     if (autoChoice.startsWith('dev-')) return { provider: 'device', metric: autoChoice.slice(4) as DeviceMetric };
+    if (autoChoice.startsWith('screen-'))
+      return { provider: 'screen', scope: autoChoice.slice(7) as ScreenScope, limitMin: limitNum };
     return { provider: 'health', metric: autoChoice as HealthMetric };
-  }, [autoChoice, autoUser]);
+  }, [autoChoice, autoUser, limitNum]);
 
   const autoOptions: { value: AutoChoice; label: string; icon: IconName }[] = [
     { value: 'none', label: 'Manual', icon: 'hand-waving' },
@@ -135,6 +152,12 @@ export default function EditHabitScreen() {
           { value: 'dev-walk' as const, label: 'Walks', icon: 'person-simple-walk' as IconName },
           { value: 'dev-run' as const, label: 'Runs', icon: 'person-simple-run' as IconName },
           { value: 'dev-ride' as const, label: 'Rides', icon: 'person-simple-bike' as IconName },
+        ]
+      : []),
+    ...(screenSupported
+      ? [
+          { value: 'screen-all' as const, label: 'Screen time limit', icon: 'hourglass-high' as IconName },
+          { value: 'screen-guarded' as const, label: 'Guarded apps limit', icon: 'device-mobile-slash' as IconName },
         ]
       : []),
     { value: 'github', label: 'GitHub', icon: 'github-logo' },
@@ -150,6 +173,10 @@ export default function EditHabitScreen() {
 
   const pickAuto = (choice: AutoChoice) => {
     setAutoChoice(choice);
+    if (choice.startsWith('screen-')) {
+      setKind('check');
+      return;
+    }
     if (choice === 'dev-steps') {
       setKind('count');
       setUnit('steps');
@@ -188,6 +215,10 @@ export default function EditHabitScreen() {
       toast("That doesn't look like a GitHub username", { tone: 'error' });
       return;
     }
+    if (ladder && kind !== 'check' && !isScreen && goalNum <= targetNum) {
+      toast('Your goal should be bigger than where you start', { tone: 'error' });
+      return;
+    }
     if (schedule.type === 'days' && schedule.days.length === 0) {
       toast('Pick at least one day', { tone: 'error' });
       return;
@@ -198,9 +229,12 @@ export default function EditHabitScreen() {
       name: name.trim(),
       icon,
       color,
-      kind,
-      target: kind === 'check' ? 1 : targetNum,
-      unit: kind === 'check' ? null : kind === 'duration' ? 'min' : unit.trim() || null,
+      kind: isScreen ? ('check' as const) : kind,
+      target: kind === 'check' || isScreen ? 1 : targetNum,
+      unit: kind === 'check' || isScreen ? null : kind === 'duration' ? 'min' : unit.trim() || null,
+      goalTarget: ladder && kind !== 'check' && !isScreen && goalNum > targetNum ? goalNum : null,
+      cue: cue.trim() || null,
+      tiny: tiny.trim() || null,
       schedule,
       reminders: [...new Set(reminders)].sort(),
       auto: autoSource,
@@ -219,6 +253,9 @@ export default function EditHabitScreen() {
     if (autoSource?.provider === 'device') {
       const res = await enableAutoSensing().catch(() => ({ steps: false, activity: false }));
       if (!res.steps && !res.activity) toast('Allow Physical activity so your phone can track this', { tone: 'error' });
+    }
+    if (autoSource?.provider === 'screen' && !enableScreenTime()) {
+      toast('Allow Usage access for Ritual, then come back', { icon: 'hourglass-high' });
     }
     if (autoSource?.provider === 'health') {
       const ok = await requestHealthPermissions().catch(() => false);
@@ -357,43 +394,92 @@ export default function EditHabitScreen() {
         ) : null}
 
         <Section title="Goal">
-          <Segmented<HabitKind>
-            value={kind}
-            onChange={(k) => {
-              setKind(k);
-              if (k === 'duration' && targetNum < 5) setTarget('15');
-              if (k === 'count' && targetNum < 2) setTarget('8');
-            }}
-            options={[
-              { value: 'check', label: 'Yes / No', icon: 'check-circle' },
-              { value: 'count', label: 'Count', icon: 'plus-circle' },
-              { value: 'duration', label: 'Time', icon: 'timer' },
-            ]}
-          />
-          {kind !== 'check' ? (
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <TextField
-                  label={kind === 'duration' ? 'Minutes a day' : 'Target'}
-                  value={target}
-                  onChangeText={setTarget}
-                  keyboardType="numeric"
-                  maxLength={6}
-                />
-              </View>
-              {kind === 'count' ? (
-                <View style={{ flex: 1.3 }}>
-                  <TextField
-                    label="Unit"
-                    value={unit}
-                    onChangeText={setUnit}
-                    placeholder="pages, glasses…"
-                    maxLength={16}
-                  />
+          {isScreen ? (
+            <TextField
+              label={
+                autoChoice === 'screen-all'
+                  ? 'Daily screen time limit (minutes)'
+                  : 'Daily limit for guarded apps (minutes)'
+              }
+              value={limit}
+              onChangeText={setLimit}
+              keyboardType="numeric"
+              maxLength={4}
+              hint="Counts as done while you stay under. Aim a little below today, not a detox."
+            />
+          ) : (
+            <>
+              <Segmented<HabitKind>
+                value={kind}
+                onChange={(k) => {
+                  setKind(k);
+                  if (k === 'duration' && targetNum < 5) setTarget('15');
+                  if (k === 'count' && targetNum < 2) setTarget('8');
+                }}
+                options={[
+                  { value: 'check', label: 'Yes / No', icon: 'check-circle' },
+                  { value: 'count', label: 'Count', icon: 'plus-circle' },
+                  { value: 'duration', label: 'Time', icon: 'timer' },
+                ]}
+              />
+              {kind !== 'check' ? (
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <TextField
+                      label={kind === 'duration' ? 'Minutes a day' : 'Target'}
+                      value={target}
+                      onChangeText={setTarget}
+                      keyboardType="numeric"
+                      maxLength={6}
+                    />
+                  </View>
+                  {kind === 'count' ? (
+                    <View style={{ flex: 1.3 }}>
+                      <TextField
+                        label="Unit"
+                        value={unit}
+                        onChangeText={setUnit}
+                        placeholder="pages, glasses…"
+                        maxLength={16}
+                      />
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
-            </View>
-          ) : null}
+              {kind !== 'check' ? (
+                <>
+                  <View style={{ flexDirection: 'row' }}>
+                    <Chip
+                      icon="stairs"
+                      label="Build up to it"
+                      selected={ladder}
+                      onPress={() => {
+                        const next = !ladder;
+                        setLadder(next);
+                        if (next && !goal) {
+                          // Start at about 40% of the goal: easy enough to repeat, big enough to count.
+                          setGoal(String(targetNum));
+                          setTarget(
+                            String(niceAmount({ kind, unit }, Math.max(kind === 'duration' ? 2 : 1, targetNum * 0.4))),
+                          );
+                        }
+                      }}
+                    />
+                  </View>
+                  {ladder ? (
+                    <TextField
+                      label={kind === 'duration' ? 'Where you are heading (minutes)' : 'Where you are heading'}
+                      value={goal}
+                      onChangeText={setGoal}
+                      keyboardType="numeric"
+                      maxLength={6}
+                      hint="You start at the target above. When it gets easy, the coach suggests the next step up, never past this goal."
+                    />
+                  ) : null}
+                </>
+              ) : null}
+            </>
+          )}
         </Section>
 
         <Section title="Schedule">
@@ -477,6 +563,23 @@ export default function EditHabitScreen() {
           ) : null}
         </Section>
 
+        {!isScreen ? (
+          <Section title="When, exactly?">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {CUES.map((c) => (
+                <Chip key={c} label={c} size="sm" selected={cue === c} onPress={() => setCue(cue === c ? '' : c)} />
+              ))}
+            </View>
+            <TextField
+              value={cue}
+              onChangeText={setCue}
+              placeholder="After I…"
+              maxLength={60}
+              hint="Tie it to something you already do. A specific moment beats a vague intention."
+            />
+          </Section>
+        ) : null}
+
         <Section title="Auto-track">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {autoOptions.map((o) => (
@@ -503,6 +606,12 @@ export default function EditHabitScreen() {
                   : 'Days with a LeetCode submission count. Your submission calendar is imported.'
               }
             />
+          ) : isScreen ? (
+            <Text variant="caption" tone="faint">
+              {autoChoice === 'screen-all'
+                ? 'Measured from Android’s own usage log, even with Ritual closed and offline. Needs Usage access once.'
+                : 'Counts only the apps you guard in Screen time (social, video, games…). Needs Usage access once.'}
+            </Text>
           ) : autoChoice.startsWith('dev-') ? (
             <Text variant="caption" tone="faint">
               {autoChoice === 'dev-steps'
@@ -527,7 +636,7 @@ export default function EditHabitScreen() {
           <View style={{ flex: 1 }}>
             <Text variant="bodyStrong">More options</Text>
             <Text variant="caption" tone="muted">
-              Difficulty, category and your why
+              Two-minute version, difficulty, category and your why
             </Text>
           </View>
           <Icon name={more ? 'caret-up' : 'caret-down'} size={16} color={t.textMuted} />
@@ -535,6 +644,15 @@ export default function EditHabitScreen() {
 
         {more ? (
           <>
+            <TextField
+              label="Two-minute version"
+              value={tiny}
+              onChangeText={setTiny}
+              placeholder={tinyVersion({ name, kind, target: targetNum, unit, tiny: null }).label}
+              maxLength={60}
+              hint="The smallest version that still counts. On hard days and in easy mode it keeps the streak alive."
+            />
+
             <Section title="Difficulty">
               <Segmented<Difficulty>
                 value={difficulty}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="ritual_gate_label">Ritual mindful pause</string>
+  <string name="ritual_gate_summary">A breathing pause before the apps you chose</string>
+  <string name="ritual_gate_description">Shows a short breathing pause before the apps you chose to guard in Ritual, so opening them becomes a decision instead of a reflex. Ritual only learns which app came to the front. It never reads what is on your screen, and nothing leaves your phone.</string>
+
+  <style name="Theme.Ritual.Pause" parent="@android:style/Theme.Material.NoActionBar">
+    <item name="android:windowBackground">@android:color/black</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <item name="android:windowLightStatusBar">false</item>
+    <item name="android:windowAnimationStyle">@null</item>
+  </style>
+</resources>
